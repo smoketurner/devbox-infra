@@ -1,0 +1,79 @@
+name: Validation
+description: Validate the complete image by verifying installed tools, service status, and configuration
+schemaVersion: 1.0
+phases:
+  - name: validate
+    steps:
+      - name: VerifyInstalledTools
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "=== Verifying installed tools ==="
+            - which git || exit 1
+            - which docker || exit 1
+            - which node || exit 1
+            - which python3 || exit 1
+            - source /etc/profile.d/go.sh && which go || exit 1
+            - source /etc/profile.d/rust.sh && which rustc || exit 1
+            - which aws || exit 1
+            - which gh || exit 1
+            - which jq || exit 1
+            - which tmux || exit 1
+            - which cmake || exit 1
+            - echo "All required tools present"
+      - name: VerifyServiceStatus
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "=== Verifying service status ==="
+            - systemctl is-enabled docker || exit 1
+            - systemctl is-enabled amazon-ssm-agent || exit 1
+            - systemctl is-enabled amazon-cloudwatch-agent || exit 1
+            - systemctl is-enabled devbox-warmup.service || exit 1
+            - systemctl is-enabled auditd || exit 1
+            - echo "All required services enabled"
+      - name: VerifySecurityConfig
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "=== Verifying security configuration ==="
+            - sshd -t || exit 1
+            - grep -q "PermitRootLogin no" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
+            - grep -q "PasswordAuthentication no" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
+            - sysctl net.ipv4.ip_forward | grep -q "= 1" || exit 1
+            - sysctl kernel.randomize_va_space | grep -q "= 2" || exit 1
+            - visudo -c || exit 1
+            - echo "Security configuration validated"
+      - name: VerifyUserConfig
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "=== Verifying user configuration ==="
+            - id devbox || exit 1
+            - groups devbox | grep -q docker || exit 1
+            - test -d /workspace || exit 1
+            - test -d /opt/devbox || exit 1
+            - test -x /opt/devbox/warmup.sh || exit 1
+            - echo "User configuration validated"
+      - name: VerifyDiskSpace
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "=== Verifying disk space ==="
+            - AVAIL_GB=$(df -BG / | tail -1 | awk '{print $4}' | tr -d 'G')
+            - echo "Available root disk space: ${AVAIL_GB}G"
+            - test "$AVAIL_GB" -ge 10 || (echo "ERROR: Less than 10G available" && exit 1)
+            - echo "Disk space check passed"
+      - name: PrintVersionSummary
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "=== Version Summary ==="
+            - echo "Git: $(git --version)"
+            - echo "Docker: $(docker --version)"
+            - echo "Node: $(node --version)"
+            - echo "Python: $(python3 --version)"
+            - source /etc/profile.d/go.sh && echo "Go: $(go version)"
+            - source /etc/profile.d/rust.sh && echo "Rust: $(rustc --version)"
+            - echo "AWS CLI: $(aws --version)"
+            - echo "=== Validation Complete ==="

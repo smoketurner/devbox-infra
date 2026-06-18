@@ -1,0 +1,58 @@
+name: AgentDependencies
+description: Install agent-specific dependencies and runtime requirements for the devbox agent
+schemaVersion: 1.0
+phases:
+  - name: build
+    steps:
+      - name: InstallSSMAgent
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Ensuring SSM Agent is installed and enabled"
+            - dnf install -y amazon-ssm-agent
+            - systemctl enable amazon-ssm-agent
+      - name: InstallCloudWatchAgent
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Installing CloudWatch Agent"
+            - dnf install -y amazon-cloudwatch-agent
+            - systemctl enable amazon-cloudwatch-agent
+      - name: InstallAWSCLI
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Installing AWS CLI v2"
+            - curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+            - unzip -q /tmp/awscliv2.zip -d /tmp
+            - /tmp/aws/install
+            - rm -rf /tmp/aws /tmp/awscliv2.zip
+      - name: CreateDevboxUser
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Creating devbox user"
+            - useradd -m -s /bin/bash -G docker devbox
+            - mkdir -p /home/devbox/.ssh
+            - chmod 700 /home/devbox/.ssh
+            - chown -R devbox:devbox /home/devbox/.ssh
+      - name: CreateWorkspaceDirectory
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Creating workspace directory"
+            - mkdir -p /workspace
+            - chown devbox:devbox /workspace
+            - chmod 755 /workspace
+  - name: validate
+    steps:
+      - name: ValidateAgentDependencies
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Validating agent dependencies installed"
+            - systemctl is-enabled amazon-ssm-agent || exit 1
+            - systemctl is-enabled amazon-cloudwatch-agent || exit 1
+            - aws --version || exit 1
+            - id devbox || exit 1
+            - test -d /workspace || exit 1

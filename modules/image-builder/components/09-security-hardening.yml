@@ -1,0 +1,93 @@
+name: SecurityHardening
+description: Apply security hardening measures including kernel parameters, firewall rules, and audit configuration
+schemaVersion: 1.0
+phases:
+  - name: build
+    steps:
+      - name: KernelHardening
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Applying kernel security parameters"
+            - |
+              cat > /etc/sysctl.d/99-devbox-security.conf <<'EOF'
+              # Network security
+              net.ipv4.ip_forward = 1
+              net.ipv4.conf.all.send_redirects = 0
+              net.ipv4.conf.default.send_redirects = 0
+              net.ipv4.conf.all.accept_redirects = 0
+              net.ipv4.conf.default.accept_redirects = 0
+              net.ipv4.conf.all.accept_source_route = 0
+              net.ipv4.conf.default.accept_source_route = 0
+              net.ipv4.conf.all.log_martians = 1
+              net.ipv4.tcp_syncookies = 1
+              net.ipv6.conf.all.accept_redirects = 0
+              net.ipv6.conf.default.accept_redirects = 0
+
+              # Kernel hardening
+              kernel.randomize_va_space = 2
+              kernel.dmesg_restrict = 1
+              kernel.kptr_restrict = 2
+              fs.suid_dumpable = 0
+              fs.protected_hardlinks = 1
+              fs.protected_symlinks = 1
+
+              # File descriptor limits for dev workloads
+              fs.file-max = 2097152
+              fs.inotify.max_user_watches = 524288
+              fs.inotify.max_user_instances = 1024
+              EOF
+            - sysctl --system
+      - name: ConfigureAudit
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Configuring audit rules"
+            - dnf install -y audit
+            - |
+              cat > /etc/audit/rules.d/devbox.rules <<'EOF'
+              # Monitor privilege escalation
+              -w /etc/sudoers -p wa -k sudoers_changes
+              -w /etc/passwd -p wa -k user_changes
+              -w /etc/group -p wa -k group_changes
+
+              # Monitor SSH keys
+              -w /home/devbox/.ssh -p wa -k ssh_key_changes
+
+              # Monitor Docker socket
+              -w /var/run/docker.sock -p wa -k docker_access
+              EOF
+            - systemctl enable auditd
+      - name: DisableUnneededServices
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Disabling unneeded services"
+            - systemctl disable --now rpcbind.socket 2>/dev/null || true
+            - systemctl disable --now rpcbind 2>/dev/null || true
+            - systemctl mask rpcbind 2>/dev/null || true
+      - name: ConfigureSudo
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Configuring sudo for devbox user"
+            - |
+              cat > /etc/sudoers.d/devbox <<'EOF'
+              # Allow devbox user passwordless sudo for development tasks
+              devbox ALL=(ALL) NOPASSWD: ALL
+              EOF
+            - chmod 440 /etc/sudoers.d/devbox
+            - visudo -c
+  - name: validate
+    steps:
+      - name: ValidateSecurityHardening
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Validating security hardening applied"
+            - sysctl net.ipv4.ip_forward | grep -q "= 1" || exit 1
+            - sysctl kernel.randomize_va_space | grep -q "= 2" || exit 1
+            - sysctl fs.protected_hardlinks | grep -q "= 1" || exit 1
+            - test -f /etc/audit/rules.d/devbox.rules || exit 1
+            - test -f /etc/sudoers.d/devbox || exit 1
+            - visudo -c || exit 1

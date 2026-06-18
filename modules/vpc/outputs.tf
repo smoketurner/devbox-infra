@@ -23,9 +23,9 @@ output "private_subnet_cidr_blocks" {
   value       = module.vpc.private_subnets_cidr_blocks
 }
 
-output "private_subnet_ipv6_cidr_blocks" {
+output "private_subnets_ipv6_cidr_blocks" {
   description = "List of IPv6 CIDR blocks of private subnets"
-  value       = module.vpc.private_subnet_ipv6_cidr_blocks
+  value       = module.vpc.private_subnets_ipv6_cidr_blocks
 }
 
 output "azs" {

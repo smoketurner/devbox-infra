@@ -17,3 +17,18 @@ output "egress_nat_public_ips" {
   description = "Public IPs of the NAT gateways in the egress VPC"
   value       = module.egress.nat_public_ips
 }
+
+output "image_builder_pipeline_arn" {
+  description = "ARN of the Image Builder pipeline"
+  value       = module.image_builder.pipeline_arn
+}
+
+output "image_builder_ssm_parameter_name" {
+  description = "Name of the SSM parameter storing the latest AMI ID"
+  value       = module.image_builder.ssm_parameter_name
+}
+
+output "image_builder_sns_topic_arn" {
+  description = "ARN of the pipeline notification SNS topic"
+  value       = module.image_builder.sns_topic_arn
+}

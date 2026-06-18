@@ -1,0 +1,74 @@
+name: SSHConfig
+description: Configure SSH server settings and authorized key management for secure access
+schemaVersion: 1.0
+phases:
+  - name: build
+    steps:
+      - name: ConfigureSSHD
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Configuring SSH daemon"
+            - cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
+            - |
+              cat > /etc/ssh/sshd_config.d/99-devbox.conf <<'EOF'
+              # Devbox SSH hardening configuration
+              PermitRootLogin no
+              PasswordAuthentication no
+              PubkeyAuthentication yes
+              AuthorizedKeysFile .ssh/authorized_keys
+              ChallengeResponseAuthentication no
+              UsePAM yes
+              X11Forwarding no
+              PrintMotd no
+              AcceptEnv LANG LC_*
+              MaxAuthTries 3
+              MaxSessions 10
+              ClientAliveInterval 60
+              ClientAliveCountMax 3
+              LoginGraceTime 30
+              AllowUsers devbox
+              EOF
+            - chmod 600 /etc/ssh/sshd_config.d/99-devbox.conf
+      - name: ConfigureAuthorizedKeysCommand
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Configuring dynamic authorized keys via SSM"
+            - |
+              cat > /usr/local/bin/devbox-authorized-keys <<'EOF'
+              #!/bin/bash
+              # Fetch authorized keys from SSM Parameter Store
+              # The devbox agent sets the SSH public key at claim time
+              INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+              aws ssm get-parameter \
+                --name "/devbox/instance/${INSTANCE_ID}/ssh-key" \
+                --query 'Parameter.Value' \
+                --output text 2>/dev/null || true
+              EOF
+            - chmod 755 /usr/local/bin/devbox-authorized-keys
+            - |
+              cat >> /etc/ssh/sshd_config.d/99-devbox.conf <<'EOF'
+              AuthorizedKeysCommand /usr/local/bin/devbox-authorized-keys
+              AuthorizedKeysCommandUser nobody
+              EOF
+      - name: GenerateHostKeys
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Regenerating SSH host keys"
+            - rm -f /etc/ssh/ssh_host_*
+            - ssh-keygen -t ed25519 -f /etc/ssh/ssh_host_ed25519_key -N ""
+            - ssh-keygen -t rsa -b 4096 -f /etc/ssh/ssh_host_rsa_key -N ""
+  - name: validate
+    steps:
+      - name: ValidateSSHConfig
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Validating SSH configuration"
+            - sshd -t || exit 1
+            - test -f /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
+            - test -x /usr/local/bin/devbox-authorized-keys || exit 1
+            - grep -q "PermitRootLogin no" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
+            - grep -q "PasswordAuthentication no" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1

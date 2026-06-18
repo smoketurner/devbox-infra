@@ -1,0 +1,58 @@
+name: RepoCloning
+description: Configure repository cloning tools and credentials for source code access
+schemaVersion: 1.0
+phases:
+  - name: build
+    steps:
+      - name: ConfigureGitCredentials
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Configuring Git credential helpers"
+            - dnf install -y git-credential-libsecret
+            - |
+              cat > /usr/local/bin/devbox-git-credential-helper <<'EOF'
+              #!/bin/bash
+              # Fetches Git credentials from Secrets Manager at claim time
+              # This script is a placeholder - the actual implementation will
+              # be injected by the devbox agent on instance claim
+              echo "protocol=https"
+              echo "host=github.com"
+              echo "username=token"
+              echo "password=$(aws secretsmanager get-secret-value --secret-id devbox/git-token --query SecretString --output text 2>/dev/null || echo '')"
+              EOF
+            - chmod 755 /usr/local/bin/devbox-git-credential-helper
+      - name: ConfigureSSHForGit
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Configuring SSH for Git operations"
+            - mkdir -p /etc/skel/.ssh
+            - |
+              cat > /etc/skel/.ssh/config <<'EOF'
+              Host github.com
+                StrictHostKeyChecking accept-new
+                IdentityFile ~/.ssh/id_ed25519
+              Host *.github.com
+                StrictHostKeyChecking accept-new
+                IdentityFile ~/.ssh/id_ed25519
+              EOF
+            - chmod 600 /etc/skel/.ssh/config
+      - name: InstallGitHubCLI
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Installing GitHub CLI"
+            - dnf install -y 'dnf-command(config-manager)'
+            - dnf config-manager --add-repo https://cli.github.com/packages/rpm/gh-cli.repo
+            - dnf install -y gh
+  - name: validate
+    steps:
+      - name: ValidateRepoCloning
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Validating repository cloning configuration"
+            - test -x /usr/local/bin/devbox-git-credential-helper || exit 1
+            - test -f /etc/skel/.ssh/config || exit 1
+            - gh --version || exit 1
