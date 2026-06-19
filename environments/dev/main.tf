@@ -23,7 +23,7 @@ module "egress" {
   single_nat_gateway = true
 
   # Associate VPC endpoints with the workload VPC for shared DNS resolution
-  associated_vpc_ids   = [module.vpc.vpc_id]
+  associated_vpc_ids   = { workload = module.vpc.vpc_id }
   associated_vpc_cidrs = [local.vpc_cidr]
 
   tags = local.tags
@@ -69,6 +69,20 @@ module "vpc_peering" {
   accepter_cidr_block      = module.egress.vpc_cidr_block
   accepter_ipv6_cidr_block = module.egress.vpc_ipv6_cidr_block
   accepter_route_table_ids = module.egress.private_route_table_ids
+
+  tags = local.tags
+}
+
+module "pool" {
+  source = "../../modules/pool"
+
+  name_prefix = "devbox-${local.environment}"
+  environment = local.environment
+  pool_id     = "default"
+
+  vpc_id             = module.vpc.vpc_id
+  subnet_ids         = module.vpc.private_subnets
+  security_group_ids = []
 
   tags = local.tags
 }

@@ -38,9 +38,9 @@ variable "tags" {
 }
 
 variable "associated_vpc_ids" {
-  description = "VPC IDs to associate with private hosted zones for VPC endpoint DNS resolution"
-  type        = list(string)
-  default     = []
+  description = "Map of static key to VPC ID for private hosted zone associations. Keys must be known at plan time."
+  type        = map(string)
+  default     = {}
 }
 
 variable "associated_vpc_cidrs" {

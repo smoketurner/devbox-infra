@@ -84,25 +84,6 @@ resource "aws_security_group" "vpc_endpoints" {
   })
 }
 
-locals {
-  # VPC endpoints to create — private_dns_enabled is false because we manage
-  # DNS via Route 53 private hosted zones associated with spoke VPCs
-  endpoints = {
-    ssm = {
-      service = "ssm"
-      phz     = "ssm.us-east-1.amazonaws.com"
-    }
-    ssmmessages = {
-      service = "ssmmessages"
-      phz     = "ssmmessages.us-east-1.amazonaws.com"
-    }
-    ec2messages = {
-      service = "ec2messages"
-      phz     = "ec2messages.us-east-1.amazonaws.com"
-    }
-  }
-}
-
 resource "aws_vpc_endpoint" "this" {
   for_each = local.endpoints
 
@@ -146,10 +127,10 @@ resource "aws_route53_zone" "endpoint" {
 }
 
 resource "aws_route53_zone_association" "spoke" {
-  for_each = { for pair in setproduct(keys(local.endpoints), var.associated_vpc_ids) :
+  for_each = { for pair in setproduct(keys(local.endpoints), keys(var.associated_vpc_ids)) :
     "${pair[0]}-${pair[1]}" => {
       endpoint = pair[0]
-      vpc_id   = pair[1]
+      vpc_id   = var.associated_vpc_ids[pair[1]]
     }
   }
 
