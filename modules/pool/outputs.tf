@@ -38,6 +38,16 @@ output "security_group_id" {
   value       = aws_security_group.pool.id
 }
 
+output "host_role_arn" {
+  description = "ARN of the pool host (instance) IAM role"
+  value       = aws_iam_role.host.arn
+}
+
+output "host_instance_profile_name" {
+  description = "Name of the pool host instance profile"
+  value       = aws_iam_instance_profile.host.name
+}
+
 output "control_plane_instance_profile_name" {
   description = "Name of the control-plane instance profile"
   value       = aws_iam_instance_profile.control_plane.name

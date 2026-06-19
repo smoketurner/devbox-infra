@@ -38,15 +38,10 @@ module "image_builder" {
   egress_subnet_ids = module.egress.private_subnets
 
   component_files = [
-    "01-base-updates.yml",
-    "02-dev-tools.yml",
-    "03-language-runtimes.yml",
-    "04-container-tooling.yml",
-    "05-agent-dependencies.yml",
-    "06-repo-cloning.yml",
-    "07-warmup-daemon.yml",
-    "08-ssh-config.yml",
-    "09-security-hardening.yml",
+    "01-base.yml",
+    "02-toolchain.yml",
+    "03-repos.yml",
+    "04-devbox.yml.tftpl",
     "99-validation.yml",
   ]
 

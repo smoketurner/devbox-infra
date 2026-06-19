@@ -50,6 +50,10 @@ resource "aws_launch_template" "pool" {
   image_id      = "resolve:ssm:${var.ssm_ami_parameter}"
   instance_type = var.instance_type
 
+  iam_instance_profile {
+    arn = aws_iam_instance_profile.host.arn
+  }
+
   metadata_options {
     http_endpoint               = "enabled"
     http_tokens                 = "required"

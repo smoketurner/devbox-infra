@@ -30,6 +30,7 @@ phases:
             - systemctl is-enabled amazon-ssm-agent || exit 1
             - systemctl is-enabled amazon-cloudwatch-agent || exit 1
             - systemctl is-enabled devbox-warmup.service || exit 1
+            - systemctl is-enabled devbox-owner-sync.service || exit 1
             - systemctl is-enabled auditd || exit 1
             - echo "All required services enabled"
       - name: VerifySecurityConfig
@@ -40,21 +41,20 @@ phases:
             - sshd -t || exit 1
             - grep -q "PermitRootLogin no" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
             - grep -q "PasswordAuthentication no" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
+            - grep -q "AuthorizedPrincipalsCommand /usr/local/sbin/devbox-agent" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
             - sysctl net.ipv4.ip_forward | grep -q "= 1" || exit 1
             - sysctl kernel.randomize_va_space | grep -q "= 2" || exit 1
             - visudo -c || exit 1
             - echo "Security configuration validated"
-      - name: VerifyUserConfig
+      - name: VerifyDevboxAgent
         action: ExecuteBash
         inputs:
           commands:
-            - echo "=== Verifying user configuration ==="
-            - id devbox || exit 1
-            - groups devbox | grep -q docker || exit 1
+            - echo "=== Verifying devbox agent ==="
+            - test -x /usr/local/sbin/devbox-agent || exit 1
+            - /usr/local/sbin/devbox-agent --version || exit 1
             - test -d /workspace || exit 1
-            - test -d /opt/devbox || exit 1
-            - test -x /opt/devbox/warmup.sh || exit 1
-            - echo "User configuration validated"
+            - echo "Devbox agent validated"
       - name: VerifyDiskSpace
         action: ExecuteBash
         inputs:

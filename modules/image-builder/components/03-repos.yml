@@ -1,5 +1,5 @@
-name: RepoCloning
-description: Configure repository cloning tools and credentials for source code access
+name: Repos
+description: Configure repository access tooling (Git credentials, GitHub CLI, SSH skel)
 schemaVersion: 1.0
 phases:
   - name: build
@@ -48,11 +48,11 @@ phases:
             - dnf install -y gh
   - name: validate
     steps:
-      - name: ValidateRepoCloning
+      - name: ValidateRepos
         action: ExecuteBash
         inputs:
           commands:
-            - echo "Validating repository cloning configuration"
+            - echo "Validating repository access tooling"
             - test -x /usr/local/bin/devbox-git-credential-helper || exit 1
             - test -f /etc/skel/.ssh/config || exit 1
             - gh --version || exit 1

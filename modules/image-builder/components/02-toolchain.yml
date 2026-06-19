@@ -1,0 +1,170 @@
+name: Toolchain
+description: Install development tools, language runtimes (Node, Python, Go, Rust), and container tooling
+schemaVersion: 1.0
+phases:
+  - name: build
+    steps:
+      - name: InstallBuildEssentials
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Installing build essentials"
+            - dnf groupinstall -y "Development Tools"
+            - dnf install -y \
+                gcc \
+                gcc-c++ \
+                make \
+                cmake \
+                autoconf \
+                automake \
+                libtool \
+                pkgconfig \
+                clang \
+                llvm \
+                openssl-devel \
+                zlib-devel \
+                libffi-devel \
+                readline-devel \
+                sqlite-devel \
+                bzip2-devel \
+                xz-devel
+      - name: InstallGit
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Installing Git and Git LFS"
+            - dnf install -y git git-lfs
+            - git lfs install --system
+      - name: InstallGitConfig
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Configuring global Git settings"
+            - |
+              git config --system credential.helper 'cache --timeout=3600'
+              git config --system init.defaultBranch main
+              git config --system core.autocrlf input
+      - name: InstallPython312
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Installing Python 3.12 (base AMI has 3.9)"
+            - dnf install -y python3.12 python3.12-pip python3.12-devel
+            - alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 100
+            - python3.12 -m pip install --upgrade pip setuptools wheel
+            - python3.12 -m pip install virtualenv pipx
+      - name: InstallNodeJS
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Installing Node.js 22 LTS"
+            - dnf install -y nodejs22 nodejs22-npm
+            - npm install -g npm@latest
+            - npm install -g yarn pnpm typescript
+      - name: InstallGo
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Installing Go"
+            - "GO_VERSION=$(curl -s 'https://go.dev/dl/?mode=json' | jq -r '.[0].version')"
+            - "curl -fsSL \"https://go.dev/dl/${GO_VERSION}.linux-arm64.tar.gz\" -o /tmp/go.tar.gz"
+            - tar -C /usr/local -xzf /tmp/go.tar.gz
+            - rm -f /tmp/go.tar.gz
+            - |
+              cat > /etc/profile.d/go.sh <<'EOF'
+              export GOROOT=/usr/local/go
+              export GOPATH=$HOME/go
+              export PATH=$GOROOT/bin:$GOPATH/bin:$PATH
+              EOF
+            - chmod 644 /etc/profile.d/go.sh
+      - name: InstallRust
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Installing Rust toolchain"
+            - export RUSTUP_HOME=/opt/rust/rustup
+            - export CARGO_HOME=/opt/rust/cargo
+            - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile default
+            - |
+              cat > /etc/profile.d/rust.sh <<'EOF'
+              export RUSTUP_HOME=/opt/rust/rustup
+              export CARGO_HOME=/opt/rust/cargo
+              export PATH=$CARGO_HOME/bin:$PATH
+              EOF
+            - chmod 644 /etc/profile.d/rust.sh
+            - source /etc/profile.d/rust.sh
+            - rustup component add clippy rustfmt rust-analyzer
+      - name: InstallDocker
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Installing Docker"
+            - dnf install -y docker
+            - systemctl enable docker
+      - name: ConfigureDocker
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Configuring Docker daemon"
+            - mkdir -p /etc/docker
+            - |
+              cat > /etc/docker/daemon.json <<'EOF'
+              {
+                "log-driver": "json-file",
+                "log-opts": {
+                  "max-size": "50m",
+                  "max-file": "3"
+                },
+                "storage-driver": "overlay2",
+                "default-ulimits": {
+                  "nofile": {
+                    "Name": "nofile",
+                    "Hard": 65536,
+                    "Soft": 65536
+                  }
+                }
+              }
+              EOF
+      - name: InstallDockerCompose
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Installing Docker Compose plugin"
+            - mkdir -p /usr/local/lib/docker/cli-plugins
+            - "COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | jq -r .tag_name)"
+            - "curl -fsSL \"https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-linux-aarch64\" -o /usr/local/lib/docker/cli-plugins/docker-compose"
+            - chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+      - name: InstallBuildx
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Installing Docker Buildx"
+            - "BUILDX_VERSION=$(curl -s https://api.github.com/repos/docker/buildx/releases/latest | jq -r .tag_name)"
+            - "curl -fsSL \"https://github.com/docker/buildx/releases/download/${BUILDX_VERSION}/buildx-${BUILDX_VERSION}.linux-arm64\" -o /usr/local/lib/docker/cli-plugins/docker-buildx"
+            - chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx
+  - name: validate
+    steps:
+      - name: ValidateToolchain
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Validating development tools and runtimes"
+            - gcc --version || exit 1
+            - g++ --version || exit 1
+            - make --version || exit 1
+            - cmake --version || exit 1
+            - clang --version || exit 1
+            - git --version || exit 1
+            - git lfs version || exit 1
+            - source /etc/profile.d/go.sh
+            - source /etc/profile.d/rust.sh
+            - python3.12 --version || exit 1
+            - node --version || exit 1
+            - npm --version || exit 1
+            - go version || exit 1
+            - rustc --version || exit 1
+            - cargo --version || exit 1
+            - docker --version || exit 1
+            - docker compose version || exit 1
+            - docker buildx version || exit 1
+            - systemctl is-enabled docker || exit 1

@@ -1,3 +1,35 @@
+# Host (instance) IAM Role
+#
+# Attached to pool instances via the Launch Template. Grants exactly what the
+# on-host devbox-agent needs: SSM core (so callers reach sshd over an SSM tunnel)
+# and completion of the instance's own warm-up lifecycle hook. Reading the
+# devbox:owner tag for SSH authorization uses IMDS and needs no IAM.
+
+resource "aws_iam_role" "host" {
+  name               = "${local.name_prefix}-host"
+  assume_role_policy = data.aws_iam_policy_document.host_assume_role.json
+
+  tags = local.tags
+}
+
+resource "aws_iam_role_policy_attachment" "host_ssm" {
+  role       = aws_iam_role.host.name
+  policy_arn = data.aws_iam_policy.ssm_core.arn
+}
+
+resource "aws_iam_role_policy" "host_runtime" {
+  name   = "${local.name_prefix}-host-runtime"
+  role   = aws_iam_role.host.id
+  policy = data.aws_iam_policy_document.host_runtime.json
+}
+
+resource "aws_iam_instance_profile" "host" {
+  name = "${local.name_prefix}-host"
+  role = aws_iam_role.host.name
+
+  tags = local.tags
+}
+
 # Control Plane IAM Role
 #
 # Provides least-privilege permissions for the devbox control plane (reconciler).

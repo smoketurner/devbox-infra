@@ -1,0 +1,171 @@
+name: Devbox
+description: Install host agent dependencies, the devbox-agent binary and services, and Vouch-CA SSH config
+schemaVersion: 1.0
+phases:
+  - name: build
+    steps:
+      - name: EnsureSSMAgent
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Ensuring SSM Agent is enabled (already installed on base AMI)"
+            - systemctl enable amazon-ssm-agent
+      - name: InstallCloudWatchAgent
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Installing CloudWatch Agent"
+            - dnf install -y amazon-cloudwatch-agent
+            - systemctl enable amazon-cloudwatch-agent
+      - name: VerifyAWSCLI
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Verifying AWS CLI v2 (already installed on base AMI)"
+            - aws --version
+      - name: CreateWorkspaceDirectory
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Creating workspace directory"
+            # Per-claim login accounts are provisioned at claim time by
+            # devbox-owner-sync.service, which also hands /workspace to the
+            # claimant. The AMI ships it root-owned and unclaimed.
+            - mkdir -p /workspace
+            - chown root:root /workspace
+            - chmod 0755 /workspace
+      - name: DownloadAgent
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Downloading devbox-agent from ${agent_url}"
+            - curl -fsSL "${agent_url}" -o /usr/local/sbin/devbox-agent
+            - |
+              if [ -n "${agent_sha256}" ]; then
+                echo "${agent_sha256}  /usr/local/sbin/devbox-agent" | sha256sum -c -
+              else
+                echo "No sha256 pinned; skipping checksum verification"
+              fi
+            - chown root:root /usr/local/sbin/devbox-agent
+            - chmod 0755 /usr/local/sbin/devbox-agent
+            - /usr/local/sbin/devbox-agent --version
+      - name: InstallWarmupService
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Installing devbox-warmup.service"
+            - |
+              cat > /etc/systemd/system/devbox-warmup.service <<'EOF'
+              [Unit]
+              Description=Devbox warm-up (release ASG launch lifecycle hook)
+              After=network-online.target docker.service amazon-ssm-agent.service
+              Wants=network-online.target
+
+              [Service]
+              Type=oneshot
+              ExecStart=/usr/local/sbin/devbox-agent warmup
+              RemainAfterExit=yes
+              StandardOutput=journal
+              StandardError=journal
+
+              [Install]
+              WantedBy=multi-user.target
+              EOF
+            - systemctl daemon-reload
+            - systemctl enable devbox-warmup.service
+      - name: InstallOwnerSyncService
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Installing devbox-owner-sync.service"
+            - |
+              cat > /etc/systemd/system/devbox-owner-sync.service <<'EOF'
+              [Unit]
+              Description=Devbox owner-sync (provision the claimant's login account)
+              After=network-online.target
+              Wants=network-online.target
+
+              [Service]
+              Type=simple
+              ExecStart=/usr/local/sbin/devbox-agent owner-sync
+              Restart=always
+              RestartSec=5
+              StandardOutput=journal
+              StandardError=journal
+
+              [Install]
+              WantedBy=multi-user.target
+              EOF
+            - systemctl daemon-reload
+            - systemctl enable devbox-owner-sync.service
+      - name: ConfigureSSHD
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Configuring SSH daemon"
+            - cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
+            - |
+              cat > /etc/ssh/sshd_config.d/99-devbox.conf <<'EOF'
+              # Devbox SSH hardening
+              PermitRootLogin no
+              PasswordAuthentication no
+              PubkeyAuthentication yes
+              KbdInteractiveAuthentication no
+              UsePAM yes
+              X11Forwarding no
+              PrintMotd no
+              AcceptEnv LANG LC_*
+              MaxAuthTries 3
+              MaxSessions 10
+              # Keep agent sessions alive (~3600s idle): 300s * 12
+              ClientAliveInterval 300
+              ClientAliveCountMax 12
+              LoginGraceTime 30
+
+              # Vouch SSH certificate authentication
+              TrustedUserCAKeys /etc/ssh/vouch_ca.pub
+              # Per-claim authorization: the login user must equal the devbox:owner
+              # tag (the claimant's Vouch principal). Resolved on every auth by the
+              # on-host devbox-agent reading IMDS; fail-closed when unclaimed. The
+              # matching Unix account is provisioned by devbox-owner-sync.service.
+              AuthorizedPrincipalsCommand /usr/local/sbin/devbox-agent principals %u
+              AuthorizedPrincipalsCommandUser nobody
+              EOF
+            - chmod 600 /etc/ssh/sshd_config.d/99-devbox.conf
+      - name: ConfigureVouchCA
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Fetching Vouch SSH CA public key"
+            - curl -fsS https://us.vouch.sh/v1/credentials/ssh/ca | jq -r '.public_key' > /etc/ssh/vouch_ca.pub
+            - chmod 644 /etc/ssh/vouch_ca.pub
+            - test -s /etc/ssh/vouch_ca.pub
+      - name: GenerateHostKeys
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Regenerating SSH host keys"
+            - rm -f /etc/ssh/ssh_host_*
+            - ssh-keygen -t ed25519 -f /etc/ssh/ssh_host_ed25519_key -N ""
+            - ssh-keygen -t rsa -b 4096 -f /etc/ssh/ssh_host_rsa_key -N ""
+  - name: validate
+    steps:
+      - name: ValidateDevbox
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Validating devbox host configuration"
+            - systemctl is-enabled amazon-ssm-agent || exit 1
+            - systemctl is-enabled amazon-cloudwatch-agent || exit 1
+            - aws --version || exit 1
+            - test -d /workspace || exit 1
+            - test -x /usr/local/sbin/devbox-agent || exit 1
+            - /usr/local/sbin/devbox-agent --version || exit 1
+            - systemctl is-enabled devbox-warmup.service || exit 1
+            - systemctl is-enabled devbox-owner-sync.service || exit 1
+            - sshd -t || exit 1
+            - test -s /etc/ssh/vouch_ca.pub || exit 1
+            - grep -q "TrustedUserCAKeys" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
+            - grep -q "AuthorizedPrincipalsCommand /usr/local/sbin/devbox-agent" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
+            - grep -q "PermitRootLogin no" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
+            - grep -q "PasswordAuthentication no" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1

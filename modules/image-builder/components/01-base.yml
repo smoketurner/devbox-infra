@@ -1,9 +1,40 @@
-name: SecurityHardening
-description: Apply security hardening measures including kernel parameters, firewall rules, and audit configuration
+name: Base
+description: Apply base OS updates, core packages, system limits, and security hardening
 schemaVersion: 1.0
 phases:
   - name: build
     steps:
+      - name: UpdateOS
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Applying base OS updates"
+            - dnf update -y --security
+            - dnf update -y kernel || true
+      - name: InstallAdditionalPackages
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Installing packages not in base AMI"
+            - dnf install -y htop tmux patch
+      - name: ConfigureTimezone
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Configuring timezone to UTC"
+            - timedatectl set-timezone UTC
+      - name: ConfigureLimits
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Configuring system limits"
+            - |
+              cat >> /etc/security/limits.conf <<'EOF'
+              * soft nofile 65536
+              * hard nofile 65536
+              * soft nproc 65536
+              * hard nproc 65536
+              EOF
       - name: KernelHardening
         action: ExecuteBash
         inputs:
@@ -51,8 +82,8 @@ phases:
               -w /etc/passwd -p wa -k user_changes
               -w /etc/group -p wa -k group_changes
 
-              # Monitor SSH keys
-              -w /home/devbox/.ssh -p wa -k ssh_key_changes
+              # Monitor SSH trust configuration (CA key, sshd drop-ins)
+              -w /etc/ssh -p wa -k ssh_config_changes
 
               # Monitor Docker socket
               -w /var/run/docker.sock -p wa -k docker_access
@@ -66,28 +97,19 @@ phases:
             - systemctl disable --now rpcbind.socket 2>/dev/null || true
             - systemctl disable --now rpcbind 2>/dev/null || true
             - systemctl mask rpcbind 2>/dev/null || true
-      - name: ConfigureSudo
-        action: ExecuteBash
-        inputs:
-          commands:
-            - echo "Configuring sudo for devbox user"
-            - |
-              cat > /etc/sudoers.d/devbox <<'EOF'
-              # Allow devbox user passwordless sudo for development tasks
-              devbox ALL=(ALL) NOPASSWD: ALL
-              EOF
-            - chmod 440 /etc/sudoers.d/devbox
-            - visudo -c
   - name: validate
     steps:
-      - name: ValidateSecurityHardening
+      - name: ValidateBase
         action: ExecuteBash
         inputs:
           commands:
-            - echo "Validating security hardening applied"
+            - echo "Validating base OS and hardening"
+            - which jq || exit 1
+            - which curl || exit 1
+            - which tmux || exit 1
+            - timedatectl | grep -q "UTC" || exit 1
             - sysctl net.ipv4.ip_forward | grep -q "= 1" || exit 1
             - sysctl kernel.randomize_va_space | grep -q "= 2" || exit 1
             - sysctl fs.protected_hardlinks | grep -q "= 1" || exit 1
             - test -f /etc/audit/rules.d/devbox.rules || exit 1
-            - test -f /etc/sudoers.d/devbox || exit 1
             - visudo -c || exit 1

@@ -24,9 +24,9 @@ variable "egress_subnet_ids" {
 }
 
 variable "build_instance_type" {
-  description = "Instance type for Image Builder build instances"
+  description = "Instance type for Image Builder build instances (arm64/Graviton)"
   type        = string
-  default     = "m5.large"
+  default     = "m7g.large"
 }
 
 variable "schedule_expression" {
@@ -129,6 +129,18 @@ variable "secrets_arns" {
 variable "component_files" {
   description = "List of component YAML filenames (order derived from filename prefix)"
   type        = list(string)
+}
+
+variable "devbox_agent_url" {
+  description = "URL to download the prebuilt devbox-agent binary baked into the AMI (arm64 musl static)"
+  type        = string
+  default     = "https://github.com/smoketurner/devbox/releases/latest/download/devbox-agent-aarch64-unknown-linux-musl"
+}
+
+variable "devbox_agent_sha256" {
+  description = "Optional sha256 checksum of the devbox-agent binary to pin (empty skips verification)"
+  type        = string
+  default     = ""
 }
 
 variable "tags" {

@@ -29,9 +29,9 @@ variable "subnet_ids" {
 }
 
 variable "instance_type" {
-  description = "EC2 instance type"
+  description = "EC2 instance type (arm64/Graviton)"
   type        = string
-  default     = "m5.large"
+  default     = "m7g.large"
 }
 
 variable "min_size" {
