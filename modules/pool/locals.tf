@@ -8,8 +8,7 @@ locals {
   aws_account_id = data.aws_caller_identity.current.account_id
 
   # Naming contract (shared with control plane)
-  asg_name  = "devbox-pool-${var.pool_id}"
-  hook_name = "devbox-warmup-${var.pool_id}"
+  asg_name = "devbox-pool-${var.pool_id}"
 
   tags = merge(
     var.tags,

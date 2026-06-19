@@ -93,21 +93,23 @@ data "aws_iam_policy" "ssm_core" {
   name = "AmazonSSMManagedInstanceCore"
 }
 
-# Host runtime: the warm-up agent releases its own ASG launch lifecycle hook.
+# Host runtime: the warm-up agent self-tags its own instance devbox:ready=true.
+# "Own instance only" is not expressible in IAM (no policy variable for the
+# caller's own instance id), so this is scoped by resource type (instance/*) and
+# restricted to the devbox:ready tag key — it provably cannot touch devbox:owner
+# (the SSH authorization tag, applied by the control plane).
 data "aws_iam_policy_document" "host_runtime" {
   statement {
-    sid       = "CompleteWarmupHook"
+    sid       = "SelfTagReady"
     effect    = "Allow"
-    actions   = ["autoscaling:CompleteLifecycleAction"]
-    resources = ["arn:${local.aws_partition}:autoscaling:${local.aws_region}:${local.aws_account_id}:autoScalingGroup:*:autoScalingGroupName/${local.asg_name}"]
-  }
+    actions   = ["ec2:CreateTags"]
+    resources = ["arn:${local.aws_partition}:ec2:${local.aws_region}:${local.aws_account_id}:instance/*"]
 
-  # DescribeLifecycleHooks does not support resource-level permissions.
-  statement {
-    sid       = "DiscoverLifecycleHooks"
-    effect    = "Allow"
-    actions   = ["autoscaling:DescribeLifecycleHooks"]
-    resources = ["*"]
+    condition {
+      test     = "ForAllValues:StringEquals"
+      variable = "aws:TagKeys"
+      values   = ["devbox:ready"]
+    }
   }
 }
 

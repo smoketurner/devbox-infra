@@ -18,11 +18,6 @@ output "launch_template_arn" {
   value       = aws_launch_template.pool.arn
 }
 
-output "lifecycle_hook_name" {
-  description = "Name of the warm-up lifecycle hook"
-  value       = aws_autoscaling_lifecycle_hook.warmup.name
-}
-
 output "security_group_id" {
   description = "ID of the pool instances security group"
   value       = aws_security_group.pool.id
