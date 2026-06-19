@@ -57,7 +57,7 @@ phases:
             - |
               cat > /etc/systemd/system/devbox-warmup.service <<'EOF'
               [Unit]
-              Description=Devbox warm-up (release ASG launch lifecycle hook)
+              Description=Devbox warm-up (self-tag devbox:ready=true once warmed)
               After=network-online.target docker.service amazon-ssm-agent.service
               Wants=network-online.target
 

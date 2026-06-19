@@ -2,7 +2,7 @@
 #
 # Attached to pool instances via the Launch Template. Grants exactly what the
 # on-host devbox-agent needs: SSM core (so callers reach sshd over an SSM tunnel)
-# and completion of the instance's own warm-up lifecycle hook. Reading the
+# and ec2:CreateTags to self-tag devbox:ready=true once warmed. Reading the
 # devbox:owner tag for SSH authorization uses IMDS and needs no IAM.
 
 resource "aws_iam_role" "host" {

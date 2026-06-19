@@ -9,7 +9,7 @@ variable "environment" {
 }
 
 variable "pool_id" {
-  description = "Pool identifier used in naming contract (ASG = devbox-pool-<pool_id>, hook = devbox-warmup-<pool_id>)"
+  description = "Pool identifier used in naming contract (ASG = devbox-pool-<pool_id>)"
   type        = string
 }
 
@@ -54,12 +54,6 @@ variable "health_check_type" {
 
 variable "health_check_grace_period" {
   description = "Health check grace period in seconds"
-  type        = number
-  default     = 300
-}
-
-variable "warmup_heartbeat_timeout" {
-  description = "Lifecycle hook heartbeat timeout in seconds"
   type        = number
   default     = 300
 }
@@ -115,7 +109,7 @@ variable "ami_refresh_min_healthy_percentage" {
 }
 
 variable "ami_refresh_instance_warmup" {
-  description = "Seconds to wait after a replacement reaches InService before refreshing the next batch. Defaults to 0: the launch lifecycle hook is the readiness gate (the host only reaches InService once devbox-agent has warmed it), so no extra settle window is needed."
+  description = "Seconds the ASG waits after a replacement reaches InService before refreshing the next batch. With no launch lifecycle hook, InService no longer implies the host is warmed (the control plane gates readiness on the devbox:ready tag), so 0 rolls batches as soon as replacements are InService — not warm. Raise it to give replacements time to warm between batches."
   type        = number
   default     = 0
 

@@ -131,15 +131,3 @@ resource "aws_autoscaling_group" "pool" {
     }
   }
 }
-
-################################################################################
-# Lifecycle Hook (warm-up)
-################################################################################
-
-resource "aws_autoscaling_lifecycle_hook" "warmup" {
-  name                   = local.hook_name
-  autoscaling_group_name = aws_autoscaling_group.pool.name
-  lifecycle_transition   = "autoscaling:EC2_INSTANCE_LAUNCHING"
-  heartbeat_timeout      = var.warmup_heartbeat_timeout
-  default_result         = "ABANDON"
-}
