@@ -21,7 +21,7 @@ data "aws_iam_policy_document" "build_instance_assume_role" {
 
     principals {
       type        = "Service"
-      identifiers = ["ec2.${data.aws_partition.current.dns_suffix}"]
+      identifiers = ["ec2.${local.aws_dns_suffix}"]
     }
   }
 }
@@ -53,7 +53,7 @@ data "aws_iam_policy_document" "lifecycle_assume_role" {
 
     principals {
       type        = "Service"
-      identifiers = ["imagebuilder.${data.aws_partition.current.dns_suffix}"]
+      identifiers = ["imagebuilder.${local.aws_dns_suffix}"]
     }
   }
 }
@@ -78,7 +78,7 @@ data "aws_iam_policy_document" "lifecycle" {
     condition {
       test     = "StringEquals"
       variable = "aws:RequestedRegion"
-      values   = [data.aws_region.current.region]
+      values   = [local.aws_region]
     }
   }
 }
@@ -87,7 +87,7 @@ data "aws_iam_policy_document" "ssm_publish" {
   statement {
     effect    = "Allow"
     actions   = ["ssm:PutParameter"]
-    resources = ["arn:${data.aws_partition.current.partition}:ssm:${data.aws_region.current.region}:${data.aws_caller_identity.current.account_id}:parameter${var.ssm_parameter_path}"]
+    resources = ["arn:${local.aws_partition}:ssm:${local.aws_region}:${local.aws_account_id}:parameter${var.ssm_parameter_path}"]
   }
 }
 
@@ -99,7 +99,7 @@ data "aws_iam_policy_document" "sns_topic_policy" {
 
     principals {
       type        = "Service"
-      identifiers = ["events.${data.aws_partition.current.dns_suffix}"]
+      identifiers = ["events.${local.aws_dns_suffix}"]
     }
 
     actions   = ["sns:Publish"]
@@ -110,4 +110,69 @@ data "aws_iam_policy_document" "sns_topic_policy" {
 # SSM parameter for latest AL2023 AMI (base image for recipe)
 data "aws_ssm_parameter" "al2023_ami" {
   name = "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.18-x86_64"
+}
+
+# KMS key policy for AMI encryption
+data "aws_iam_policy_document" "kms_key" {
+  # Allow the owning account full management
+  statement {
+    sid    = "EnableRootAccountAccess"
+    effect = "Allow"
+
+    principals {
+      type        = "AWS"
+      identifiers = ["arn:${local.aws_partition}:iam::${local.aws_account_id}:root"]
+    }
+
+    actions   = ["kms:*"]
+    resources = ["*"]
+  }
+
+  # Allow Image Builder and EC2 to use the key for encryption/decryption
+  statement {
+    sid    = "AllowImageBuilderAndEC2"
+    effect = "Allow"
+
+    principals {
+      type = "AWS"
+      identifiers = [
+        aws_iam_role.build_instance.arn,
+      ]
+    }
+
+    actions = [
+      "kms:Encrypt",
+      "kms:Decrypt",
+      "kms:ReEncrypt*",
+      "kms:GenerateDataKey*",
+      "kms:DescribeKey",
+      "kms:CreateGrant",
+    ]
+
+    resources = ["*"]
+  }
+
+  # Allow trusted accounts to use the key (for cross-account AMI sharing)
+  dynamic "statement" {
+    for_each = length(var.trusted_account_ids) > 0 ? [1] : []
+    content {
+      sid    = "AllowCrossAccountUse"
+      effect = "Allow"
+
+      principals {
+        type        = "AWS"
+        identifiers = [for id in var.trusted_account_ids : "arn:${local.aws_partition}:iam::${id}:root"]
+      }
+
+      actions = [
+        "kms:Decrypt",
+        "kms:ReEncrypt*",
+        "kms:GenerateDataKey*",
+        "kms:DescribeKey",
+        "kms:CreateGrant",
+      ]
+
+      resources = ["*"]
+    }
+  }
 }

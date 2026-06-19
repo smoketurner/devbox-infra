@@ -127,13 +127,8 @@ variable "secrets_arns" {
 }
 
 variable "component_files" {
-  description = "Map of component name to configuration (file path, version, execution order, and optional template variables)"
-  type = map(object({
-    file    = string
-    version = string
-    order   = number
-    vars    = optional(map(string), {})
-  }))
+  description = "List of component YAML filenames (order derived from filename prefix)"
+  type        = list(string)
 }
 
 variable "tags" {

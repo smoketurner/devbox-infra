@@ -41,16 +41,16 @@ phases:
           commands:
             - echo "Installing Docker Compose plugin"
             - mkdir -p /usr/local/lib/docker/cli-plugins
-            - COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | jq -r .tag_name)
-            - curl -fsSL "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-linux-x86_64" -o /usr/local/lib/docker/cli-plugins/docker-compose
+            - "COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | jq -r .tag_name)"
+            - "curl -fsSL \"https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-linux-x86_64\" -o /usr/local/lib/docker/cli-plugins/docker-compose"
             - chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
       - name: InstallBuildx
         action: ExecuteBash
         inputs:
           commands:
             - echo "Installing Docker Buildx"
-            - BUILDX_VERSION=$(curl -s https://api.github.com/repos/docker/buildx/releases/latest | jq -r .tag_name)
-            - curl -fsSL "https://github.com/docker/buildx/releases/download/${BUILDX_VERSION}/buildx-${BUILDX_VERSION}.linux-amd64" -o /usr/local/lib/docker/cli-plugins/docker-buildx
+            - "BUILDX_VERSION=$(curl -s https://api.github.com/repos/docker/buildx/releases/latest | jq -r .tag_name)"
+            - "curl -fsSL \"https://github.com/docker/buildx/releases/download/${BUILDX_VERSION}/buildx-${BUILDX_VERSION}.linux-amd64\" -o /usr/local/lib/docker/cli-plugins/docker-buildx"
             - chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx
   - name: validate
     steps:

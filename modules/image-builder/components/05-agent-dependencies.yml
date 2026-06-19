@@ -4,12 +4,11 @@ schemaVersion: 1.0
 phases:
   - name: build
     steps:
-      - name: InstallSSMAgent
+      - name: EnsureSSMAgent
         action: ExecuteBash
         inputs:
           commands:
-            - echo "Ensuring SSM Agent is installed and enabled"
-            - dnf install -y amazon-ssm-agent
+            - echo "Ensuring SSM Agent is enabled (already installed on base AMI)"
             - systemctl enable amazon-ssm-agent
       - name: InstallCloudWatchAgent
         action: ExecuteBash
@@ -18,15 +17,12 @@ phases:
             - echo "Installing CloudWatch Agent"
             - dnf install -y amazon-cloudwatch-agent
             - systemctl enable amazon-cloudwatch-agent
-      - name: InstallAWSCLI
+      - name: VerifyAWSCLI
         action: ExecuteBash
         inputs:
           commands:
-            - echo "Installing AWS CLI v2"
-            - curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
-            - unzip -q /tmp/awscliv2.zip -d /tmp
-            - /tmp/aws/install
-            - rm -rf /tmp/aws /tmp/awscliv2.zip
+            - echo "Verifying AWS CLI v2 (already installed on base AMI)"
+            - aws --version
       - name: CreateDevboxUser
         action: ExecuteBash
         inputs:

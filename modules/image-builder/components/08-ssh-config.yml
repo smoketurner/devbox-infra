@@ -1,5 +1,5 @@
 name: SSHConfig
-description: Configure SSH server settings and authorized key management for secure access
+description: Configure SSH server with Vouch CA trust for certificate-based authentication
 schemaVersion: 1.0
 phases:
   - name: build
@@ -16,7 +16,6 @@ phases:
               PermitRootLogin no
               PasswordAuthentication no
               PubkeyAuthentication yes
-              AuthorizedKeysFile .ssh/authorized_keys
               ChallengeResponseAuthentication no
               UsePAM yes
               X11Forwarding no
@@ -28,30 +27,21 @@ phases:
               ClientAliveCountMax 3
               LoginGraceTime 30
               AllowUsers devbox
+
+              # Vouch SSH certificate authentication
+              TrustedUserCAKeys /etc/ssh/vouch_ca.pub
+              AuthorizedPrincipalsFile /etc/ssh/auth_principals/%u
               EOF
             - chmod 600 /etc/ssh/sshd_config.d/99-devbox.conf
-      - name: ConfigureAuthorizedKeysCommand
+      - name: ConfigureVouchCA
         action: ExecuteBash
         inputs:
           commands:
-            - echo "Configuring dynamic authorized keys via SSM"
-            - |
-              cat > /usr/local/bin/devbox-authorized-keys <<'EOF'
-              #!/bin/bash
-              # Fetch authorized keys from SSM Parameter Store
-              # The devbox agent sets the SSH public key at claim time
-              INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
-              aws ssm get-parameter \
-                --name "/devbox/instance/${INSTANCE_ID}/ssh-key" \
-                --query 'Parameter.Value' \
-                --output text 2>/dev/null || true
-              EOF
-            - chmod 755 /usr/local/bin/devbox-authorized-keys
-            - |
-              cat >> /etc/ssh/sshd_config.d/99-devbox.conf <<'EOF'
-              AuthorizedKeysCommand /usr/local/bin/devbox-authorized-keys
-              AuthorizedKeysCommandUser nobody
-              EOF
+            - echo "Fetching Vouch SSH CA public key"
+            - curl -s https://us.vouch.sh/v1/credentials/ssh/ca | jq -r '.public_key' > /etc/ssh/vouch_ca.pub
+            - chmod 644 /etc/ssh/vouch_ca.pub
+            - mkdir -p /etc/ssh/auth_principals
+            - chmod 755 /etc/ssh/auth_principals
       - name: GenerateHostKeys
         action: ExecuteBash
         inputs:
@@ -68,7 +58,9 @@ phases:
           commands:
             - echo "Validating SSH configuration"
             - sshd -t || exit 1
-            - test -f /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
-            - test -x /usr/local/bin/devbox-authorized-keys || exit 1
+            - test -f /etc/ssh/vouch_ca.pub || exit 1
+            - test -s /etc/ssh/vouch_ca.pub || exit 1
+            - test -d /etc/ssh/auth_principals || exit 1
+            - grep -q "TrustedUserCAKeys" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
             - grep -q "PermitRootLogin no" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
             - grep -q "PasswordAuthentication no" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1

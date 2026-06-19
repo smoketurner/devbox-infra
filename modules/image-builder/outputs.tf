@@ -37,3 +37,8 @@ output "build_instance_role_arn" {
   description = "ARN of the build instance IAM role"
   value       = aws_iam_role.build_instance.arn
 }
+
+output "kms_key_arn" {
+  description = "ARN of the KMS key used for AMI encryption"
+  value       = aws_kms_key.ami.arn
+}

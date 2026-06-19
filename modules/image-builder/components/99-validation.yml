@@ -12,7 +12,7 @@ phases:
             - which git || exit 1
             - which docker || exit 1
             - which node || exit 1
-            - which python3 || exit 1
+            - which python3.12 || exit 1
             - source /etc/profile.d/go.sh && which go || exit 1
             - source /etc/profile.d/rust.sh && which rustc || exit 1
             - which aws || exit 1
@@ -60,20 +60,20 @@ phases:
         inputs:
           commands:
             - echo "=== Verifying disk space ==="
-            - AVAIL_GB=$(df -BG / | tail -1 | awk '{print $4}' | tr -d 'G')
-            - echo "Available root disk space: ${AVAIL_GB}G"
-            - test "$AVAIL_GB" -ge 10 || (echo "ERROR: Less than 10G available" && exit 1)
+            - "AVAIL_GB=$(df -BG / | tail -1 | awk '{print $4}' | tr -d 'G')"
+            - "echo \"Available root disk space: ${AVAIL_GB}G\""
+            - "test \"$AVAIL_GB\" -ge 10 || (echo \"ERROR: Less than 10G available\" && exit 1)"
             - echo "Disk space check passed"
       - name: PrintVersionSummary
         action: ExecuteBash
         inputs:
           commands:
             - echo "=== Version Summary ==="
-            - echo "Git: $(git --version)"
-            - echo "Docker: $(docker --version)"
-            - echo "Node: $(node --version)"
-            - echo "Python: $(python3 --version)"
-            - source /etc/profile.d/go.sh && echo "Go: $(go version)"
-            - source /etc/profile.d/rust.sh && echo "Rust: $(rustc --version)"
-            - echo "AWS CLI: $(aws --version)"
+            - "echo \"Git: $(git --version)\""
+            - "echo \"Docker: $(docker --version)\""
+            - "echo \"Node: $(node --version)\""
+            - "echo \"Python: $(python3.12 --version)\""
+            - "source /etc/profile.d/go.sh && echo \"Go: $(go version)\""
+            - "source /etc/profile.d/rust.sh && echo \"Rust: $(rustc --version)\""
+            - "echo \"AWS CLI: $(aws --version)\""
             - echo "=== Validation Complete ==="

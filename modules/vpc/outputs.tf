@@ -33,7 +33,7 @@ output "azs" {
   value       = module.vpc.azs
 }
 
-output "vpc_endpoint_security_group_id" {
-  description = "ID of the security group attached to VPC endpoints"
-  value       = aws_security_group.vpc_endpoints.id
+output "private_route_table_ids" {
+  description = "List of IDs of private route tables"
+  value       = module.vpc.private_route_table_ids
 }

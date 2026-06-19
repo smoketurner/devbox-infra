@@ -2,16 +2,16 @@ locals {
   environment = "dev"
   region      = "us-east-1"
 
-  azs = ["us-east-1a", "us-east-1b", "us-east-1c"]
+  azs = slice(data.aws_availability_zones.available.names, 0, 3)
 
   # Workload VPC (private only, no internet access)
   vpc_cidr        = "10.0.0.0/16"
-  private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+  private_subnets = [for i, az in local.azs : cidrsubnet(local.vpc_cidr, 8, i + 1)]
 
   # Egress VPC (NAT gateway + future Network Firewall Proxy)
-  egress_vpc_cidr         = "10.1.0.0/16"
-  egress_private_subnets  = ["10.1.1.0/24", "10.1.2.0/24", "10.1.3.0/24"]
-  egress_public_subnets   = ["10.1.101.0/24", "10.1.102.0/24", "10.1.103.0/24"]
+  egress_vpc_cidr        = "10.1.0.0/16"
+  egress_private_subnets = [for i, az in local.azs : cidrsubnet(local.egress_vpc_cidr, 8, i + 1)]
+  egress_public_subnets  = [for i, az in local.azs : cidrsubnet(local.egress_vpc_cidr, 8, i + 101)]
 
   tags = {
     Environment = local.environment

@@ -22,6 +22,10 @@ module "egress" {
 
   single_nat_gateway = true
 
+  # Associate VPC endpoints with the workload VPC for shared DNS resolution
+  associated_vpc_ids   = [module.vpc.vpc_id]
+  associated_vpc_cidrs = [local.vpc_cidr]
+
   tags = local.tags
 }
 
@@ -33,58 +37,38 @@ module "image_builder" {
   egress_vpc_id     = module.egress.vpc_id
   egress_subnet_ids = module.egress.private_subnets
 
-  component_files = {
-    "01-base-updates" = {
-      file    = "01-base-updates.yml"
-      version = "1.0.0"
-      order   = 1
-    }
-    "02-dev-tools" = {
-      file    = "02-dev-tools.yml"
-      version = "1.0.0"
-      order   = 2
-    }
-    "03-language-runtimes" = {
-      file    = "03-language-runtimes.yml"
-      version = "1.0.0"
-      order   = 3
-    }
-    "04-container-tooling" = {
-      file    = "04-container-tooling.yml"
-      version = "1.0.0"
-      order   = 4
-    }
-    "05-agent-dependencies" = {
-      file    = "05-agent-dependencies.yml"
-      version = "1.0.0"
-      order   = 5
-    }
-    "06-repo-cloning" = {
-      file    = "06-repo-cloning.yml"
-      version = "1.0.0"
-      order   = 6
-    }
-    "07-warmup-daemon" = {
-      file    = "07-warmup-daemon.yml"
-      version = "1.0.0"
-      order   = 7
-    }
-    "08-ssh-config" = {
-      file    = "08-ssh-config.yml"
-      version = "1.0.0"
-      order   = 8
-    }
-    "09-security-hardening" = {
-      file    = "09-security-hardening.yml"
-      version = "1.0.0"
-      order   = 9
-    }
-    "99-validation" = {
-      file    = "99-validation.yml"
-      version = "1.0.0"
-      order   = 99
-    }
-  }
+  component_files = [
+    "01-base-updates.yml",
+    "02-dev-tools.yml",
+    "03-language-runtimes.yml",
+    "04-container-tooling.yml",
+    "05-agent-dependencies.yml",
+    "06-repo-cloning.yml",
+    "07-warmup-daemon.yml",
+    "08-ssh-config.yml",
+    "09-security-hardening.yml",
+    "99-validation.yml",
+  ]
+
+  tags = local.tags
+}
+
+# Temporary: VPC peering to allow workload VPC egress through the egress VPC's NAT gateway.
+# This will be replaced by Transit Gateway or Network Firewall Proxy endpoints.
+module "vpc_peering" {
+  source = "../../modules/vpc-peering"
+
+  name = "devbox-${local.environment}-workload-to-egress"
+
+  requester_vpc_id          = module.vpc.vpc_id
+  requester_cidr_block      = module.vpc.vpc_cidr_block
+  requester_ipv6_cidr_block = module.vpc.vpc_ipv6_cidr_block
+  requester_route_table_ids = module.vpc.private_route_table_ids
+
+  accepter_vpc_id          = module.egress.vpc_id
+  accepter_cidr_block      = module.egress.vpc_cidr_block
+  accepter_ipv6_cidr_block = module.egress.vpc_ipv6_cidr_block
+  accepter_route_table_ids = module.egress.private_route_table_ids
 
   tags = local.tags
 }

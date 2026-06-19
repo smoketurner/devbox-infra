@@ -31,20 +31,20 @@ variable "single_nat_gateway" {
   default     = true
 }
 
-variable "enable_dns_hostnames" {
-  description = "Enable DNS hostnames in the VPC"
-  type        = bool
-  default     = true
-}
-
-variable "enable_dns_support" {
-  description = "Enable DNS support in the VPC"
-  type        = bool
-  default     = true
-}
-
 variable "tags" {
   description = "Additional tags to apply to all resources"
   type        = map(string)
   default     = {}
+}
+
+variable "associated_vpc_ids" {
+  description = "VPC IDs to associate with private hosted zones for VPC endpoint DNS resolution"
+  type        = list(string)
+  default     = []
+}
+
+variable "associated_vpc_cidrs" {
+  description = "CIDR blocks of peered VPCs to allow HTTPS access to VPC endpoints"
+  type        = list(string)
+  default     = []
 }

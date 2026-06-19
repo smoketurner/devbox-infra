@@ -1,16 +1,36 @@
 # Primary resources for the image-builder module
 
 ################################################################################
+# KMS Key for AMI Encryption
+################################################################################
+
+resource "aws_kms_key" "ami" {
+  description             = "Encryption key for devbox golden AMI snapshots"
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
+  policy                  = data.aws_iam_policy_document.kms_key.json
+
+  tags = merge(local.tags, {
+    Name = "${local.name_prefix}-ami"
+  })
+}
+
+resource "aws_kms_alias" "ami" {
+  name          = "alias/${local.name_prefix}-ami"
+  target_key_id = aws_kms_key.ami.key_id
+}
+
+################################################################################
 # Image Recipe
 ################################################################################
 
 resource "aws_imagebuilder_image_recipe" "this" {
   name         = "${local.name_prefix}-recipe"
   parent_image = data.aws_ssm_parameter.al2023_ami.value
-  version      = "1.0.0"
+  version      = "1.0.2"
 
   dynamic "component" {
-    for_each = sort(keys(var.component_files))
+    for_each = sort(keys(local.component_map))
     content {
       component_arn = aws_imagebuilder_component.this[component.value].arn
     }
@@ -22,13 +42,17 @@ resource "aws_imagebuilder_image_recipe" "this" {
     ebs {
       delete_on_termination = true
       encrypted             = true
-      kms_key_id            = "alias/aws/ebs"
+      kms_key_id            = aws_kms_key.ami.arn
       volume_size           = 30
       volume_type           = "gp3"
     }
   }
 
   tags = local.tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 ################################################################################
@@ -60,30 +84,30 @@ resource "aws_imagebuilder_distribution_configuration" "this" {
 
   # Primary region distribution
   distribution {
-    region = data.aws_region.current.region
+    region = local.aws_region
 
     ami_distribution_configuration {
       name       = var.ami_name_pattern
-      kms_key_id = "alias/aws/ebs"
+      kms_key_id = aws_kms_key.ami.arn
 
       ami_tags = {
         Environment = var.environment
         ManagedBy   = "terraform"
         Pipeline    = "ami-image-builder"
         BuildDate   = "{{imagebuilder:buildDate}}"
-        SourceAMI   = "{{imagebuilder:parentImage}}"
+        SourceAMI   = data.aws_ssm_parameter.al2023_ami.value
       }
 
       launch_permission {
         user_ids = length(var.trusted_account_ids) > 0 ? concat(
-          [data.aws_caller_identity.current.account_id],
+          [local.aws_account_id],
           var.trusted_account_ids
-        ) : [data.aws_caller_identity.current.account_id]
+        ) : [local.aws_account_id]
       }
     }
 
     ssm_parameter_configuration {
-      ami_account_id = data.aws_caller_identity.current.account_id
+      ami_account_id = local.aws_account_id
       parameter_name = var.ssm_parameter_path
       data_type      = "aws:ec2:image"
     }
@@ -97,21 +121,21 @@ resource "aws_imagebuilder_distribution_configuration" "this" {
 
       ami_distribution_configuration {
         name       = var.ami_name_pattern
-        kms_key_id = "alias/aws/ebs"
+        kms_key_id = aws_kms_key.ami.arn
 
         ami_tags = {
           Environment = var.environment
           ManagedBy   = "terraform"
           Pipeline    = "ami-image-builder"
           BuildDate   = "{{imagebuilder:buildDate}}"
-          SourceAMI   = "{{imagebuilder:parentImage}}"
+          SourceAMI   = data.aws_ssm_parameter.al2023_ami.value
         }
 
         launch_permission {
           user_ids = length(var.trusted_account_ids) > 0 ? concat(
-            [data.aws_caller_identity.current.account_id],
+            [local.aws_account_id],
             var.trusted_account_ids
-          ) : [data.aws_caller_identity.current.account_id]
+          ) : [local.aws_account_id]
         }
       }
     }

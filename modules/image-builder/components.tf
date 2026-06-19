@@ -1,12 +1,17 @@
-resource "aws_imagebuilder_component" "this" {
-  for_each = var.component_files
+locals {
+  # Derive a stable key from each filename by stripping the .yml extension
+  component_map = { for f in var.component_files : trimsuffix(f, ".yml") => f }
+}
 
-  name     = "${var.name_prefix}-${each.key}-${substr(sha256(templatefile("${path.module}/components/${each.value.file}", each.value.vars)), 0, 8)}"
+resource "aws_imagebuilder_component" "this" {
+  for_each = local.component_map
+
+  name     = "${local.name_prefix}-${each.key}-${substr(sha256(file("${path.module}/components/${each.value}")), 0, 8)}"
   platform = "Linux"
-  version  = each.value.version
-  data     = templatefile("${path.module}/components/${each.value.file}", each.value.vars)
+  version  = "1.0.0"
+  data     = file("${path.module}/components/${each.value}")
 
   tags = merge(local.tags, {
-    ComponentOrder = tostring(each.value.order)
+    ComponentOrder = each.key
   })
 }

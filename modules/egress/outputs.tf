@@ -32,3 +32,8 @@ output "azs" {
   description = "List of availability zones used"
   value       = module.vpc.azs
 }
+
+output "private_route_table_ids" {
+  description = "List of IDs of private route tables"
+  value       = module.vpc.private_route_table_ids
+}

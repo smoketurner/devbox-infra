@@ -32,7 +32,7 @@ phases:
         action: ExecuteBash
         inputs:
           commands:
-            - echo "Installing Git"
+            - echo "Installing Git and Git LFS"
             - dnf install -y git git-lfs
             - git lfs install --system
       - name: InstallGitConfig
@@ -44,17 +44,6 @@ phases:
               git config --system credential.helper 'cache --timeout=3600'
               git config --system init.defaultBranch main
               git config --system core.autocrlf input
-      - name: InstallAdditionalTools
-        action: ExecuteBash
-        inputs:
-          commands:
-            - echo "Installing additional dev tools"
-            - dnf install -y \
-                strace \
-                ltrace \
-                perf \
-                valgrind \
-                gdb
   - name: validate
     steps:
       - name: ValidateDevTools

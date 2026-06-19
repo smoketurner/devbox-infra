@@ -19,6 +19,7 @@
 - ALL `data` blocks MUST live in `data.tf` — never inline in resource files
 - AWS managed IAM policies should be looked up via `data "aws_iam_policy"` by name, not hardcoded ARN strings
 - Use `data "aws_partition"`, `data "aws_region"`, `data "aws_caller_identity"` for partition-aware ARN construction
+- Define locals for AWS context and reference those throughout: `local.aws_partition`, `local.aws_dns_suffix`, `local.aws_region`, `local.aws_account_id` — never use `data.aws_partition.current.partition` directly outside `locals.tf`
 
 ## Naming
 

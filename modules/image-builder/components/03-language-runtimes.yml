@@ -1,18 +1,18 @@
 name: LanguageRuntimes
-description: Install language runtimes including Node.js, Python, Go, and Rust
+description: Install language runtimes including Node.js, Python 3.12, Go, and Rust
 schemaVersion: 1.0
 phases:
   - name: build
     steps:
-      - name: InstallPython
+      - name: InstallPython312
         action: ExecuteBash
         inputs:
           commands:
-            - echo "Installing Python 3.12"
+            - echo "Installing Python 3.12 (base AMI has 3.9)"
             - dnf install -y python3.12 python3.12-pip python3.12-devel
-            - alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1
-            - python3 -m pip install --upgrade pip setuptools wheel
-            - python3 -m pip install virtualenv pipx
+            - alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 100
+            - python3.12 -m pip install --upgrade pip setuptools wheel
+            - python3.12 -m pip install virtualenv pipx
       - name: InstallNodeJS
         action: ExecuteBash
         inputs:
@@ -26,8 +26,8 @@ phases:
         inputs:
           commands:
             - echo "Installing Go"
-            - GO_VERSION=$(curl -s 'https://go.dev/dl/?mode=json' | jq -r '.[0].version')
-            - curl -fsSL "https://go.dev/dl/${GO_VERSION}.linux-amd64.tar.gz" -o /tmp/go.tar.gz
+            - "GO_VERSION=$(curl -s 'https://go.dev/dl/?mode=json' | jq -r '.[0].version')"
+            - "curl -fsSL \"https://go.dev/dl/${GO_VERSION}.linux-amd64.tar.gz\" -o /tmp/go.tar.gz"
             - tar -C /usr/local -xzf /tmp/go.tar.gz
             - rm -f /tmp/go.tar.gz
             - |
@@ -63,7 +63,7 @@ phases:
             - echo "Validating language runtimes installed"
             - source /etc/profile.d/go.sh
             - source /etc/profile.d/rust.sh
-            - python3 --version || exit 1
+            - python3.12 --version || exit 1
             - node --version || exit 1
             - npm --version || exit 1
             - go version || exit 1
