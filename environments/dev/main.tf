@@ -81,3 +81,32 @@ module "pool" {
 
   tags = local.tags
 }
+
+# Control plane: Aurora DSQL + devbox-server on ECS/Fargate behind an internal
+# ALB with Vouch OIDC. Runs in the egress VPC (NAT reaches AWS APIs, DSQL, ECR,
+# and the Vouch OIDC endpoints). Reachable from the workload VPC via peering.
+module "control_plane" {
+  source = "../../modules/control-plane"
+
+  name_prefix = "devbox-${local.environment}"
+  environment = local.environment
+
+  vpc_id        = module.egress.vpc_id
+  subnet_ids    = module.egress.private_subnets
+  ingress_cidrs = [module.vpc.vpc_cidr_block, module.egress.vpc_cidr_block]
+
+  pool_id = "default"
+
+  # GitHub Actions pushes images + deploys via this OIDC-federated role.
+  github_repository = "smoketurner/devbox"
+
+  # OIDC endpoints default to Vouch. Supply before `apply`:
+  #  - certificate_arn: ACM cert covering the DNS name you point at the ALB.
+  #  - oidc_client_id/secret: register an app in the Vouch dashboard with redirect
+  #    URI https://<alb-domain>/oauth2/idpresponse; source the secret via TF_VAR.
+  certificate_arn    = ""
+  oidc_client_id     = ""
+  oidc_client_secret = ""
+
+  tags = local.tags
+}

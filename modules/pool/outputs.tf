@@ -23,16 +23,6 @@ output "lifecycle_hook_name" {
   value       = aws_autoscaling_lifecycle_hook.warmup.name
 }
 
-output "control_plane_role_arn" {
-  description = "ARN of the control-plane IAM role"
-  value       = aws_iam_role.control_plane.arn
-}
-
-output "control_plane_role_name" {
-  description = "Name of the control-plane IAM role"
-  value       = aws_iam_role.control_plane.name
-}
-
 output "security_group_id" {
   description = "ID of the pool instances security group"
   value       = aws_security_group.pool.id
@@ -48,7 +38,7 @@ output "host_instance_profile_name" {
   value       = aws_iam_instance_profile.host.name
 }
 
-output "control_plane_instance_profile_name" {
-  description = "Name of the control-plane instance profile"
-  value       = aws_iam_instance_profile.control_plane.name
+output "ami_refresh_document_name" {
+  description = "Name of the SSM Automation document that rolls the pool onto a new AMI"
+  value       = aws_ssm_document.ami_refresh.name
 }

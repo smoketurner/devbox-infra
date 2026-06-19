@@ -103,6 +103,28 @@ variable "metadata_hop_limit" {
   default     = 2
 }
 
+variable "ami_refresh_min_healthy_percentage" {
+  description = "Minimum healthy percentage during an AMI-refresh instance refresh. Kept at 50 so small warm pools roll one host at a time without deadlocking (90% can't replace any instance on a 2-host ASG) or fully draining."
+  type        = number
+  default     = 50
+
+  validation {
+    condition     = var.ami_refresh_min_healthy_percentage >= 0 && var.ami_refresh_min_healthy_percentage <= 100
+    error_message = "ami_refresh_min_healthy_percentage must be between 0 and 100."
+  }
+}
+
+variable "ami_refresh_instance_warmup" {
+  description = "Seconds to wait after a replacement reaches InService before refreshing the next batch. Defaults to 0: the launch lifecycle hook is the readiness gate (the host only reaches InService once devbox-agent has warmed it), so no extra settle window is needed."
+  type        = number
+  default     = 0
+
+  validation {
+    condition     = var.ami_refresh_instance_warmup >= 0
+    error_message = "ami_refresh_instance_warmup must be non-negative."
+  }
+}
+
 variable "tags" {
   description = "Additional tags to apply to all resources"
   type        = map(string)

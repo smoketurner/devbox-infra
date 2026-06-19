@@ -88,7 +88,9 @@ phases:
               [Service]
               Type=simple
               ExecStart=/usr/local/sbin/devbox-agent owner-sync
-              Restart=always
+              # owner-sync exits 0 once it has provisioned the claimant's account;
+              # only restart on failure so a clean exit stays stopped.
+              Restart=on-failure
               RestartSec=5
               StandardOutput=journal
               StandardError=journal

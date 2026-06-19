@@ -30,31 +30,36 @@ resource "aws_iam_instance_profile" "host" {
   tags = local.tags
 }
 
-# Control Plane IAM Role
+# AMI-refresh executor IAM
 #
-# Provides least-privilege permissions for the devbox control plane (reconciler).
-# The role allows only runtime operations: describe ASG, set capacity, manage
-# instance protection, complete lifecycle actions, and tag instances.
-# It explicitly excludes all Create*/Update* infrastructure permissions.
+# Two roles: the SSM Automation execution role (starts the instance refresh) and
+# the EventBridge role (starts the automation when a new AMI is published).
 
-resource "aws_iam_role" "control_plane" {
-  name               = "${local.name_prefix}-control-plane"
-  assume_role_policy = data.aws_iam_policy_document.control_plane_assume_role.json
+resource "aws_iam_role" "ami_refresh_automation" {
+  name               = "${local.name_prefix}-ami-refresh"
+  assume_role_policy = data.aws_iam_policy_document.ssm_assume_role.json
 
   tags = local.tags
 }
 
-resource "aws_iam_role_policy" "control_plane_runtime" {
-  name = "${local.name_prefix}-runtime"
-  role = aws_iam_role.control_plane.id
-
-  policy = data.aws_iam_policy_document.control_plane_runtime.json
+resource "aws_iam_role_policy" "ami_refresh_automation" {
+  name   = "${local.name_prefix}-ami-refresh"
+  role   = aws_iam_role.ami_refresh_automation.id
+  policy = data.aws_iam_policy_document.ami_refresh_automation.json
 }
 
-# Instance profile wrapping the control plane role
-resource "aws_iam_instance_profile" "control_plane" {
-  name = "${local.name_prefix}-control-plane"
-  role = aws_iam_role.control_plane.name
+resource "aws_iam_role" "ami_refresh_events" {
+  name               = "${local.name_prefix}-ami-refresh-events"
+  assume_role_policy = data.aws_iam_policy_document.events_assume_role.json
 
   tags = local.tags
 }
+
+resource "aws_iam_role_policy" "ami_refresh_events" {
+  name   = "${local.name_prefix}-ami-refresh-events"
+  role   = aws_iam_role.ami_refresh_events.id
+  policy = data.aws_iam_policy_document.ami_refresh_events.json
+}
+
+# The control-plane runtime identity lives in the `control-plane` module (the
+# Fargate task role); there is no EC2-hosted control plane here.
