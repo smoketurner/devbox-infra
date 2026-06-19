@@ -1,11 +1,16 @@
 output "alb_dns_name" {
-  description = "Internal DNS name of the control-plane ALB (point the CLI --server-url and dashboard here)"
+  description = "Public DNS name of the control-plane ALB (the Route 53 alias for domain_name points here)"
   value       = aws_lb.this.dns_name
 }
 
 output "alb_zone_id" {
   description = "Hosted zone ID of the ALB (for a Route 53 alias record)"
   value       = aws_lb.this.zone_id
+}
+
+output "control_plane_url" {
+  description = "Public URL of the control plane (point the CLI --server-url and dashboard here)"
+  value       = "https://${var.domain_name}"
 }
 
 output "ecr_repository_url" {

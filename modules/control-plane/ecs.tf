@@ -49,10 +49,12 @@ resource "aws_ecs_task_definition" "server" {
       { name = "POOL_TARGET_WARM_SIZE", value = tostring(var.target_warm_pool_size) },
       { name = "RUST_LOG", value = "info,devbox_server=info" },
       # API authentication (the dashboard is also gated by Vouch OIDC at the ALB).
+      # Audience is the CLI app's client ID — the dashboard token arrives via the
+      # ALB's x-amzn-oidc-data header, which the server validates without an aud check.
       { name = "AUTH_ENABLED", value = "true" },
       { name = "AUTH_OIDC_ISSUER", value = var.oidc_issuer },
       { name = "AUTH_OIDC_JWKS_URI", value = var.oidc_jwks_uri },
-      { name = "AUTH_OIDC_AUDIENCE", value = var.oidc_client_id },
+      { name = "AUTH_OIDC_AUDIENCE", value = var.cli_client_id },
       { name = "AUTH_PRINCIPAL_CLAIM", value = var.auth_principal_claim },
     ]
 

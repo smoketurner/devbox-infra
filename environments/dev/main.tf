@@ -82,31 +82,35 @@ module "pool" {
   tags = local.tags
 }
 
-# Control plane: Aurora DSQL + devbox-server on ECS/Fargate behind an internal
-# ALB with Vouch OIDC. Runs in the egress VPC (NAT reaches AWS APIs, DSQL, ECR,
-# and the Vouch OIDC endpoints). Reachable from the workload VPC via peering.
+# Control plane: Aurora DSQL + devbox-server on ECS/Fargate behind an internet-facing
+# ALB with Vouch OIDC. Runs in the egress VPC (the ALB is in public subnets; Fargate
+# stays private with NAT reaching AWS APIs, DSQL, ECR, and the Vouch OIDC endpoints).
 module "control_plane" {
   source = "../../modules/control-plane"
 
   name_prefix = "devbox-${local.environment}"
   environment = local.environment
 
-  vpc_id        = module.egress.vpc_id
-  subnet_ids    = module.egress.private_subnets
-  ingress_cidrs = [module.vpc.vpc_cidr_block, module.egress.vpc_cidr_block]
+  vpc_id         = module.egress.vpc_id
+  subnet_ids     = module.egress.private_subnets
+  alb_subnet_ids = module.egress.public_subnets
+  ingress_cidrs  = ["0.0.0.0/0"]
 
   pool_id = "default"
+
+  # Terraform issues the ACM cert and Route 53 alias for this hostname.
+  domain_name     = var.domain_name
+  route53_zone_id = aws_route53_zone.devbox_farm.zone_id
 
   # GitHub Actions pushes images + deploys via this OIDC-federated role.
   github_repository = "smoketurner/devbox"
 
-  # OIDC endpoints default to Vouch. Supply before `apply`:
-  #  - certificate_arn: ACM cert covering the DNS name you point at the ALB.
-  #  - oidc_client_id/secret: register an app in the Vouch dashboard with redirect
-  #    URI https://<alb-domain>/oauth2/idpresponse; source the secret via TF_VAR.
-  certificate_arn    = ""
-  oidc_client_id     = ""
-  oidc_client_secret = ""
+  # OIDC endpoints default to Vouch. Register two apps: a confidential dashboard app
+  # (redirect URI https://<domain_name>/oauth2/idpresponse) for the ALB, and a public
+  # CLI app (device-code) whose client ID the server validates API tokens against.
+  oidc_client_id     = var.oidc_client_id
+  oidc_client_secret = var.oidc_client_secret
+  cli_client_id      = var.cli_client_id
 
   tags = local.tags
 }

@@ -14,7 +14,7 @@ variable "vpc_id" {
 }
 
 variable "subnet_ids" {
-  description = "Private subnet IDs (with NAT egress) for the internal ALB and the Fargate service"
+  description = "Private subnet IDs (with NAT egress) for the Fargate service"
   type        = list(string)
 
   validation {
@@ -23,8 +23,18 @@ variable "subnet_ids" {
   }
 }
 
+variable "alb_subnet_ids" {
+  description = "Public subnet IDs (with an internet gateway route) for the internet-facing ALB"
+  type        = list(string)
+
+  validation {
+    condition     = length(var.alb_subnet_ids) >= 2
+    error_message = "At least two subnets (across AZs) are required."
+  }
+}
+
 variable "ingress_cidrs" {
-  description = "CIDRs allowed to reach the internal ALB (e.g., the workload VPC and any VPN/peered ranges)"
+  description = "CIDRs allowed to reach the public ALB (Vouch gates the dashboard; the API is bearer-token validated app-side)"
   type        = list(string)
 }
 
@@ -86,8 +96,13 @@ variable "dsql_deletion_protection" {
 
 # --- TLS + Vouch OIDC ---
 
-variable "certificate_arn" {
-  description = "ACM certificate ARN for the ALB HTTPS listener (required for OIDC, which needs HTTPS)"
+variable "domain_name" {
+  description = "Public hostname for the control plane (e.g., cp.devbox.farm); Terraform issues an ACM cert and Route 53 alias for it"
+  type        = string
+}
+
+variable "route53_zone_id" {
+  description = "Route 53 hosted zone ID that owns domain_name (for the ACM validation and alias records)"
   type        = string
 }
 
@@ -137,14 +152,20 @@ variable "auth_principal_claim" {
 }
 
 variable "oidc_client_id" {
-  description = "OIDC client ID. Register an app in the Vouch dashboard with redirect URI https://<alb-domain>/oauth2/idpresponse."
+  description = "Client ID of the confidential Vouch app the ALB uses for the dashboard OIDC flow (redirect URI https://<domain_name>/oauth2/idpresponse)"
   type        = string
 }
 
 variable "oidc_client_secret" {
-  description = "OIDC client secret (source from a secrets backend / TF_VAR, never commit)"
+  description = "Client secret for the dashboard Vouch app (source from a secrets backend / TF_VAR, never commit)"
   type        = string
   sensitive   = true
+}
+
+variable "cli_client_id" {
+  description = "Client ID of the public Vouch app the CLI/agents use (device-code flow); the server validates API bearer-token audience against it. Empty skips audience validation (any valid Vouch token from the issuer is accepted)."
+  type        = string
+  default     = ""
 }
 
 variable "oidc_scope" {

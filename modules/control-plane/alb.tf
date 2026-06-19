@@ -1,12 +1,13 @@
-# Internal ALB fronting the control plane. The dashboard is gated by Vouch OIDC;
-# the API and health path bypass OIDC (programmatic clients / health probes) and
-# are protected by network isolation (internal ALB) until app-level API auth
-# lands. The ALB lives in egress private subnets so it can reach the Vouch token
-# endpoint via NAT for the OIDC code exchange.
+# Internet-facing ALB fronting the control plane. The dashboard is gated by Vouch
+# OIDC at the listener; the API and health path bypass OIDC (programmatic clients /
+# health probes) and are validated app-side via Vouch bearer tokens (the CLI
+# obtains them through the device-authorization grant). The ALB lives in egress
+# public subnets and reaches the Vouch token endpoint via the internet gateway for
+# the OIDC code exchange.
 
 resource "aws_security_group" "alb" {
   name        = "${local.name_prefix}-alb"
-  description = "Internal ALB for the devbox control plane"
+  description = "Internet-facing ALB for the devbox control plane"
   vpc_id      = var.vpc_id
 
   tags = merge(local.tags, { Name = "${local.name_prefix}-alb" })
@@ -78,10 +79,10 @@ resource "aws_vpc_security_group_egress_rule" "service_dsql" {
 
 resource "aws_lb" "this" {
   name               = "${var.name_prefix}-cp"
-  internal           = true
+  internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb.id]
-  subnets            = var.subnet_ids
+  subnets            = var.alb_subnet_ids
 
   tags = local.tags
 }
@@ -128,7 +129,7 @@ resource "aws_lb_listener" "https" {
   port              = 443
   protocol          = "HTTPS"
   ssl_policy        = var.ssl_policy
-  certificate_arn   = var.certificate_arn
+  certificate_arn   = aws_acm_certificate_validation.this.certificate_arn
 
   # Default: require a Vouch OIDC session (protects the dashboard).
   default_action {
@@ -157,7 +158,8 @@ resource "aws_lb_listener" "https" {
 }
 
 # Programmatic + health paths bypass OIDC (the CLI/agents can't do the
-# interactive browser flow). Safe because the ALB is internal.
+# interactive browser flow). The server validates Vouch bearer tokens on these
+# paths (device-code grant); see the AUTH_* env in ecs.tf.
 resource "aws_lb_listener_rule" "api_bypass" {
   listener_arn = aws_lb_listener.https.arn
   priority     = 10
