@@ -14,18 +14,9 @@ resource "aws_security_group" "pool" {
   })
 }
 
-resource "aws_vpc_security_group_ingress_rule" "ssh" {
-  security_group_id = aws_security_group.pool.id
-  description       = "Allow inbound SSH access"
-  ip_protocol       = "tcp"
-  from_port         = 22
-  to_port           = 22
-  cidr_ipv4         = "0.0.0.0/0"
-
-  tags = merge(local.tags, {
-    Name = "${local.name_prefix}-ingress-ssh"
-  })
-}
+# No inbound rules: callers reach sshd over an AWS-StartSSHSession SSM tunnel
+# (the agent connects to sshd on loopback), so no security group ingress is
+# needed. Instances have no public IP and there is no bastion.
 
 resource "aws_vpc_security_group_egress_rule" "https" {
   security_group_id = aws_security_group.pool.id
