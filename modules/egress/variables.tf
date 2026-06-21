@@ -25,10 +25,10 @@ variable "public_subnets" {
   default     = []
 }
 
-variable "single_nat_gateway" {
-  description = "Use a single NAT gateway for all private subnets"
-  type        = bool
-  default     = true
+variable "nat_instance_type" {
+  description = "Instance type for the fck-nat NAT instance"
+  type        = string
+  default     = "t4g.micro"
 }
 
 variable "tags" {
