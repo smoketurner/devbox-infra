@@ -20,8 +20,6 @@ module "egress" {
   private_subnets = local.egress_private_subnets
   public_subnets  = local.egress_public_subnets
 
-  single_nat_gateway = true
-
   # Associate VPC endpoints with the workload VPC for shared DNS resolution
   associated_vpc_ids   = { workload = module.vpc.vpc_id }
   associated_vpc_cidrs = [local.vpc_cidr]
@@ -48,7 +46,7 @@ module "image_builder" {
   tags = local.tags
 }
 
-# Temporary: VPC peering to allow workload VPC egress through the egress VPC's NAT gateway.
+# Temporary: VPC peering to allow workload VPC egress through the egress VPC's NAT instance.
 # This will be replaced by Transit Gateway or Network Firewall Proxy endpoints.
 module "vpc_peering" {
   source = "../../modules/vpc-peering"

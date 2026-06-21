@@ -13,9 +13,9 @@ output "egress_vpc_id" {
   value       = module.egress.vpc_id
 }
 
-output "egress_nat_public_ips" {
-  description = "Public IPs of the NAT gateways in the egress VPC"
-  value       = module.egress.nat_public_ips
+output "egress_nat_eni_id" {
+  description = "Network interface ID of the fck-nat instance in the egress VPC"
+  value       = module.egress.nat_eni_id
 }
 
 output "image_builder_pipeline_arn" {

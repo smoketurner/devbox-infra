@@ -1,7 +1,7 @@
 # VPC Peering Connection
 #
 # Temporary module to enable egress from the workload VPC through the egress VPC's
-# NAT gateway via VPC peering. This will be replaced by Transit Gateway or Network
+# NAT instance via VPC peering. This will be replaced by Transit Gateway or Network
 # Firewall Proxy when available.
 
 resource "aws_vpc_peering_connection" "this" {
