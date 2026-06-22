@@ -15,8 +15,9 @@ locals {
   # ("$user", public) routes unqualified objects into.
   db_role = "devbox"
 
-  # Direct (public) DSQL endpoint; the server mints an IAM token for db_role per
-  # connection and connects over TLS (VerifyFull). See devbox-server db/dsql.rs.
+  # DSQL public endpoint; the task (public IP, direct IGW egress) reaches it and
+  # mints an IAM token for db_role per connection over TLS (VerifyFull). See
+  # devbox-server db/dsql.rs.
   dsql_endpoint = "${aws_dsql_cluster.this.identifier}.dsql.${local.aws_region}.on.aws"
   database_url  = "postgres://${local.db_role}@${local.dsql_endpoint}/postgres"
 

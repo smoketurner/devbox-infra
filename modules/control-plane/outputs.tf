@@ -1,11 +1,11 @@
-output "alb_dns_name" {
-  description = "Public DNS name of the control-plane ALB (the Route 53 alias for domain_name points here)"
+output "nlb_dns_name" {
+  description = "Public DNS name of the control-plane NLB (the Route 53 alias for domain_name points here)"
   value       = aws_lb.this.dns_name
 }
 
-output "alb_zone_id" {
-  description = "Hosted zone ID of the ALB (for a Route 53 alias record)"
-  value       = aws_lb.this.zone_id
+output "nlb_eip" {
+  description = "Static Elastic IP fronting the control-plane NLB"
+  value       = aws_eip.nlb.public_ip
 }
 
 output "control_plane_url" {

@@ -48,14 +48,28 @@ resource "aws_ecs_task_definition" "server" {
       { name = "POOL_ID", value = var.pool_id },
       { name = "POOL_TARGET_WARM_SIZE", value = tostring(var.target_warm_pool_size) },
       { name = "RUST_LOG", value = "info,devbox_server=info" },
-      # API authentication (the dashboard is also gated by Vouch OIDC at the ALB).
-      # Audience is the CLI app's client ID — the dashboard token arrives via the
-      # ALB's x-amzn-oidc-data header, which the server validates without an aud check.
+      # API authentication: the server validates Vouch bearer tokens app-side.
+      # AUTH_OIDC_AUDIENCE is the CLI app's client ID (the API token audience).
       { name = "AUTH_ENABLED", value = "true" },
       { name = "AUTH_OIDC_ISSUER", value = var.oidc_issuer },
       { name = "AUTH_OIDC_JWKS_URI", value = var.oidc_jwks_uri },
       { name = "AUTH_OIDC_AUDIENCE", value = var.cli_client_id },
       { name = "AUTH_PRINCIPAL_CLAIM", value = var.auth_principal_claim },
+      # Dashboard login: app-side OIDC Authorization Code flow (the NLB is L4 and
+      # can't gate it). Presence of CLIENT_ID/SECRET/REDIRECT_URI enables it; the
+      # secret is injected from an encrypted SSM parameter (see `secrets` + oidc.tf).
+      { name = "AUTH_OIDC_CLIENT_ID", value = var.oidc_client_id },
+      { name = "AUTH_OIDC_AUTHORIZATION_ENDPOINT", value = var.oidc_authorization_endpoint },
+      { name = "AUTH_OIDC_TOKEN_ENDPOINT", value = var.oidc_token_endpoint },
+      { name = "AUTH_OIDC_REDIRECT_URI", value = "https://${var.domain_name}/oauth2/idpresponse" },
+      { name = "AUTH_OIDC_SCOPE", value = var.oidc_scope },
+    ]
+
+    secrets = [
+      {
+        name      = "AUTH_OIDC_CLIENT_SECRET"
+        valueFrom = aws_ssm_parameter.oidc_client_secret.arn
+      },
     ]
 
     logConfiguration = {
@@ -78,10 +92,15 @@ resource "aws_ecs_service" "server" {
   desired_count   = var.desired_count
   launch_type     = "FARGATE"
 
+  enable_ecs_managed_tags = true
+  propagate_tags          = "SERVICE"
+
+  # Tasks run in the public subnet with a public IP so they egress directly to
+  # DSQL's public endpoint and ECR via the internet gateway (no NAT/proxy).
   network_configuration {
     subnets          = var.subnet_ids
     security_groups  = [aws_security_group.service.id]
-    assign_public_ip = false
+    assign_public_ip = true
   }
 
   load_balancer {
@@ -101,7 +120,7 @@ resource "aws_ecs_service" "server" {
     rollback = true
   }
 
-  depends_on = [aws_lb_listener.https]
+  depends_on = [aws_lb_listener.tls]
 
   # CI deploys immutable, sha-pinned task-definition revisions (see
   # .github/workflows/deploy.yml); Terraform sets only the initial revision.

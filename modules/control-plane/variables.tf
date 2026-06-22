@@ -9,32 +9,22 @@ variable "environment" {
 }
 
 variable "vpc_id" {
-  description = "VPC the ALB and Fargate service run in (the egress VPC: has NAT for OIDC token exchange, AWS APIs, DSQL, and ECR)"
+  description = "VPC the NLB and Fargate service run in (a dedicated control-plane VPC with a public subnet + internet gateway)"
   type        = string
 }
 
 variable "subnet_ids" {
-  description = "Private subnet IDs (with NAT egress) for the Fargate service"
+  description = "Public subnet IDs (internet-gateway route) for the NLB and the public-IP Fargate tasks"
   type        = list(string)
 
   validation {
-    condition     = length(var.subnet_ids) >= 2
-    error_message = "At least two subnets (across AZs) are required."
-  }
-}
-
-variable "alb_subnet_ids" {
-  description = "Public subnet IDs (with an internet gateway route) for the internet-facing ALB"
-  type        = list(string)
-
-  validation {
-    condition     = length(var.alb_subnet_ids) >= 2
-    error_message = "At least two subnets (across AZs) are required."
+    condition     = length(var.subnet_ids) >= 1
+    error_message = "At least one subnet is required."
   }
 }
 
 variable "ingress_cidrs" {
-  description = "CIDRs allowed to reach the public ALB (Vouch gates the dashboard; the API is bearer-token validated app-side)"
+  description = "CIDRs allowed to reach the public NLB on 443 (the API is bearer-token validated app-side)"
   type        = list(string)
 }
 
@@ -107,14 +97,21 @@ variable "route53_zone_id" {
 }
 
 variable "ssl_policy" {
-  description = "ALB HTTPS listener SSL policy"
+  description = "TLS security policy for the NLB TLS listener"
   type        = string
   default     = "ELBSecurityPolicy-TLS13-1-2-2021-06"
 }
 
-# OIDC endpoints default to Vouch (https://vouch.sh/docs/applications/). Override
-# for a different Vouch region or IdP. See the Vouch discovery document:
-# https://us.vouch.sh/.well-known/openid-configuration
+# Dashboard login is performed app-side by the server (OIDC Authorization Code
+# flow), not by the load balancer (the NLB is L4). oidc_client_id,
+# oidc_client_secret, oidc_authorization_endpoint, oidc_token_endpoint, and
+# oidc_scope feed that flow (see the AUTH_OIDC_* env in ecs.tf); the server
+# validates API bearer tokens with oidc_issuer, oidc_jwks_uri, cli_client_id, and
+# auth_principal_claim. oidc_user_info_endpoint is currently unused (the flow
+# reads the ID token directly).
+#
+# OIDC endpoints default to Vouch (https://vouch.sh/docs/applications/). See the
+# Vouch discovery document: https://us.vouch.sh/.well-known/openid-configuration
 variable "oidc_issuer" {
   description = "OIDC issuer URL"
   type        = string

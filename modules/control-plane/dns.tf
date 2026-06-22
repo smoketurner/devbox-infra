@@ -1,5 +1,5 @@
-# DNS-validated ACM certificate for the ALB HTTPS listener, plus the alias record
-# pointing the control-plane hostname at the ALB. The hosted zone is owned by the
+# DNS-validated ACM certificate for the NLB TLS listener, plus the alias record
+# pointing the control-plane hostname at the NLB. The hosted zone is owned by the
 # caller (passed via route53_zone_id).
 
 resource "aws_acm_certificate" "this" {
@@ -35,7 +35,7 @@ resource "aws_acm_certificate_validation" "this" {
   validation_record_fqdns = [for record in aws_route53_record.cert_validation : record.fqdn]
 }
 
-resource "aws_route53_record" "alb" {
+resource "aws_route53_record" "control_plane" {
   zone_id = var.route53_zone_id
   name    = var.domain_name
   type    = "A"
@@ -45,4 +45,9 @@ resource "aws_route53_record" "alb" {
     zone_id                = aws_lb.this.zone_id
     evaluate_target_health = true
   }
+}
+
+moved {
+  from = aws_route53_record.alb
+  to   = aws_route53_record.control_plane
 }
