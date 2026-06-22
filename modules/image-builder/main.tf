@@ -27,7 +27,7 @@ resource "aws_kms_alias" "ami" {
 resource "aws_imagebuilder_image_recipe" "this" {
   name         = "${local.name_prefix}-recipe"
   parent_image = data.aws_ssm_parameter.al2023_ami.value
-  version      = "1.0.2"
+  version      = "1.0.3"
 
   dynamic "component" {
     for_each = sort(keys(local.component_map))
