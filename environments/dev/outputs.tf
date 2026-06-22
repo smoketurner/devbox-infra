@@ -42,3 +42,38 @@ output "control_plane_url" {
   description = "Public URL of the control plane (CLI --server-url and dashboard)"
   value       = module.control_plane.control_plane_url
 }
+
+output "github_deploy_role_arn" {
+  description = "ARN of the role GitHub Actions assumes to push images and deploy (set as the workflow's role-to-assume)"
+  value       = module.control_plane.github_deploy_role_arn
+}
+
+output "dsql_bootstrap_sql" {
+  description = "One-time bootstrap SQL for the DSQL cluster (run as admin before first deploy to create the app database role and its owned schema)"
+  value       = module.control_plane.dsql_bootstrap_sql
+}
+
+output "ecr_repository_url" {
+  description = "ECR repository CI pushes the devbox-server image to"
+  value       = module.control_plane.ecr_repository_url
+}
+
+output "ecr_repository_name" {
+  description = "ECR repository name (for the deploy workflow)"
+  value       = module.control_plane.ecr_repository_name
+}
+
+output "ecs_cluster_name" {
+  description = "ECS cluster name (for the deploy workflow)"
+  value       = module.control_plane.ecs_cluster_name
+}
+
+output "service_name" {
+  description = "ECS service name (for the deploy workflow)"
+  value       = module.control_plane.service_name
+}
+
+output "ecs_task_family" {
+  description = "ECS task-definition family (for the deploy workflow's ECS_TASK_FAMILY)"
+  value       = module.control_plane.ecs_task_family
+}

@@ -9,10 +9,16 @@ locals {
   # Adopted ASG (naming contract shared with the pool module and reconciler).
   asg_arn = "arn:${local.aws_partition}:autoscaling:${local.aws_region}:${local.aws_account_id}:autoScalingGroup:*:autoScalingGroupName/devbox-pool-${var.pool_id}"
 
-  # Direct (public) DSQL endpoint; the server mints an IAM admin token per
+  # Dedicated least-privilege DSQL role the app authenticates as via IAM
+  # (dsql:DbConnect). Created by the bootstrap SQL (see templates/bootstrap.sql.tftpl);
+  # the role name doubles as its owned schema, which the default search_path
+  # ("$user", public) routes unqualified objects into.
+  db_role = "devbox"
+
+  # Direct (public) DSQL endpoint; the server mints an IAM token for db_role per
   # connection and connects over TLS (VerifyFull). See devbox-server db/dsql.rs.
   dsql_endpoint = "${aws_dsql_cluster.this.identifier}.dsql.${local.aws_region}.on.aws"
-  database_url  = "postgres://admin@${local.dsql_endpoint}/postgres"
+  database_url  = "postgres://${local.db_role}@${local.dsql_endpoint}/postgres"
 
   container_image = "${aws_ecr_repository.server.repository_url}:${var.image_tag}"
 

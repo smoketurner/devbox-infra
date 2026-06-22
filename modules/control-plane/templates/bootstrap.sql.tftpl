@@ -1,0 +1,16 @@
+-- Bootstrap the control-plane DSQL cluster. Apply once, connected as the DSQL
+-- admin role (dsql:DbConnectAdmin), before the service starts.
+--
+-- Creates a dedicated least-privilege database role for the control-plane and
+-- maps the ECS task's IAM role to it, so the app authenticates as ${db_role}
+-- (dsql:DbConnect) rather than admin. DSQL reserves the `public` schema for
+-- admin, so the role gets its own schema; the default search_path ("$user",
+-- public) routes the app's unqualified tables and migrations into it.
+
+CREATE ROLE ${db_role} WITH LOGIN;
+
+AWS IAM GRANT ${db_role} TO '${task_role_arn}';
+
+CREATE SCHEMA IF NOT EXISTS ${db_role};
+GRANT USAGE, CREATE ON SCHEMA ${db_role} TO ${db_role};
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA ${db_role} TO ${db_role};

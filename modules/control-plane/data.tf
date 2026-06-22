@@ -54,11 +54,12 @@ data "aws_iam_policy_document" "task" {
     }
   }
 
-  # IAM-authenticated DSQL connection as the admin user.
+  # IAM-authenticated DSQL connection as the custom db_role (not admin). The
+  # role is created and mapped to this task role by the bootstrap SQL.
   statement {
     sid       = "DsqlConnect"
     effect    = "Allow"
-    actions   = ["dsql:DbConnectAdmin"]
+    actions   = ["dsql:DbConnect"]
     resources = [aws_dsql_cluster.this.arn]
   }
 }

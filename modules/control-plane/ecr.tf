@@ -2,8 +2,16 @@
 # the Fargate task pulls `image_tag` from it.
 
 resource "aws_ecr_repository" "server" {
-  name                 = "${var.name_prefix}-server"
-  image_tag_mutability = "MUTABLE"
+  name = "${var.name_prefix}-server"
+
+  # Tags are immutable so a deployed digest can't be overwritten in place,
+  # except `latest`, which CI moves to the most recent build.
+  image_tag_mutability = "IMMUTABLE_WITH_EXCLUSION"
+
+  image_tag_mutability_exclusion_filter {
+    filter      = "latest"
+    filter_type = "WILDCARD"
+  }
 
   image_scanning_configuration {
     scan_on_push = true

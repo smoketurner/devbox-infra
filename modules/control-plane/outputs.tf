@@ -38,6 +38,14 @@ output "dsql_endpoint" {
   value       = local.dsql_endpoint
 }
 
+output "dsql_bootstrap_sql" {
+  description = "One-time bootstrap SQL for the DSQL cluster: run as the admin role to create the app database role, map it to the task IAM role, and give it an owned schema. Apply before the service connects."
+  value = templatefile("${path.module}/templates/bootstrap.sql.tftpl", {
+    db_role       = local.db_role
+    task_role_arn = aws_iam_role.task.arn
+  })
+}
+
 output "ecs_cluster_name" {
   description = "ECS cluster name"
   value       = aws_ecs_cluster.this.name
