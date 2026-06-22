@@ -54,7 +54,6 @@ resource "aws_ecs_task_definition" "server" {
       { name = "AUTH_OIDC_ISSUER", value = var.oidc_issuer },
       { name = "AUTH_OIDC_JWKS_URI", value = var.oidc_jwks_uri },
       { name = "AUTH_OIDC_AUDIENCE", value = var.cli_client_id },
-      { name = "AUTH_PRINCIPAL_CLAIM", value = var.auth_principal_claim },
       # Dashboard login: app-side OIDC Authorization Code flow (the NLB is L4 and
       # can't gate it). Presence of CLIENT_ID/SECRET/REDIRECT_URI enables it; the
       # secret is injected from an encrypted SSM parameter (see `secrets` + oidc.tf).

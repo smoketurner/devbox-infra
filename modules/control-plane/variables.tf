@@ -106,9 +106,10 @@ variable "ssl_policy" {
 # flow), not by the load balancer (the NLB is L4). oidc_client_id,
 # oidc_client_secret, oidc_authorization_endpoint, oidc_token_endpoint, and
 # oidc_scope feed that flow (see the AUTH_OIDC_* env in ecs.tf); the server
-# validates API bearer tokens with oidc_issuer, oidc_jwks_uri, cli_client_id, and
-# auth_principal_claim. oidc_user_info_endpoint is currently unused (the flow
-# reads the ID token directly).
+# validates API bearer tokens with oidc_issuer, oidc_jwks_uri, and cli_client_id.
+# The owner/Unix login is derived from the token's email claim (no configurable
+# principal claim). oidc_user_info_endpoint is currently unused (the flow reads
+# the ID token directly).
 #
 # OIDC endpoints default to Vouch (https://vouch.sh/docs/applications/). See the
 # Vouch discovery document: https://us.vouch.sh/.well-known/openid-configuration
@@ -140,12 +141,6 @@ variable "oidc_jwks_uri" {
   description = "JWKS URI the server uses to validate bearer tokens (CLI/agents)"
   type        = string
   default     = "https://us.vouch.sh/oauth/jwks"
-}
-
-variable "auth_principal_claim" {
-  description = "JWT claim used as the principal/owner; MUST match the Vouch SSH cert principal (a Unix-safe username)"
-  type        = string
-  default     = "sub"
 }
 
 variable "oidc_client_id" {
