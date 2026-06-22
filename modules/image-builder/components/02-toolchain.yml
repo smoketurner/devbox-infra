@@ -10,7 +10,8 @@ phases:
           commands:
             - echo "Installing build essentials"
             - dnf groupinstall -y "Development Tools"
-            - dnf install -y \
+            - |
+              dnf install -y \
                 gcc \
                 gcc-c++ \
                 make \
