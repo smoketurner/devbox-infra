@@ -80,19 +80,40 @@ module "pool" {
   tags = local.tags
 }
 
-# Control plane: Aurora DSQL + devbox-server on ECS/Fargate behind an internet-facing
-# ALB with Vouch OIDC. Runs in the egress VPC (the ALB is in public subnets; Fargate
-# stays private with NAT reaching AWS APIs, DSQL, ECR, and the Vouch OIDC endpoints).
+# Dedicated control-plane VPC: a single public subnet with an internet gateway.
+# The ECS tasks run here with public IPs (direct egress to DSQL's public endpoint
+# and ECR), fronted by an NLB. Kept separate from the egress VPC, whose proxy/NAT
+# is built for 443-only controlled egress and black-holes the DSQL 5432 path.
+module "control_plane_vpc" {
+  source  = "terraform-aws-modules/vpc/aws"
+  version = "6.6.1"
+
+  name = "devbox-${local.environment}-control-plane"
+  cidr = local.cp_vpc_cidr
+
+  azs            = [local.azs[0]]
+  public_subnets = local.cp_public_subnets
+
+  enable_nat_gateway      = false
+  enable_dns_hostnames    = true
+  enable_dns_support      = true
+  map_public_ip_on_launch = true
+
+  tags = local.tags
+}
+
+# Control plane: Aurora DSQL + devbox-server on ECS/Fargate. The tasks run in the
+# control-plane VPC's public subnet with public IPs and reach DSQL's public
+# endpoint directly; an internet-facing NLB (static EIP + TLS) fronts them.
 module "control_plane" {
   source = "../../modules/control-plane"
 
   name_prefix = "devbox-${local.environment}"
   environment = local.environment
 
-  vpc_id         = module.egress.vpc_id
-  subnet_ids     = module.egress.private_subnets
-  alb_subnet_ids = module.egress.public_subnets
-  ingress_cidrs  = ["0.0.0.0/0"]
+  vpc_id        = module.control_plane_vpc.vpc_id
+  subnet_ids    = module.control_plane_vpc.public_subnets
+  ingress_cidrs = ["0.0.0.0/0"]
 
   pool_id = "default"
 
