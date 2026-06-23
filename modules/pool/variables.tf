@@ -3,11 +3,6 @@ variable "name_prefix" {
   type        = string
 }
 
-variable "environment" {
-  description = "Environment name (e.g., dev)"
-  type        = string
-}
-
 variable "pool_id" {
   description = "Pool identifier used in naming contract (ASG = devbox-pool-<pool_id>)"
   type        = string

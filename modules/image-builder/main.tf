@@ -90,13 +90,11 @@ resource "aws_imagebuilder_distribution_configuration" "this" {
       name       = var.ami_name_pattern
       kms_key_id = aws_kms_key.ami.arn
 
-      ami_tags = {
-        Environment = var.environment
-        ManagedBy   = "terraform"
-        Pipeline    = "ami-image-builder"
-        BuildDate   = "{{imagebuilder:buildDate}}"
-        SourceAMI   = data.aws_ssm_parameter.al2023_ami.value
-      }
+      ami_tags = merge(var.tags, {
+        Pipeline  = "ami-image-builder"
+        BuildDate = "{{imagebuilder:buildDate}}"
+        SourceAMI = data.aws_ssm_parameter.al2023_ami.value
+      })
 
       launch_permission {
         user_ids = length(var.trusted_account_ids) > 0 ? concat(
@@ -123,13 +121,11 @@ resource "aws_imagebuilder_distribution_configuration" "this" {
         name       = var.ami_name_pattern
         kms_key_id = aws_kms_key.ami.arn
 
-        ami_tags = {
-          Environment = var.environment
-          ManagedBy   = "terraform"
-          Pipeline    = "ami-image-builder"
-          BuildDate   = "{{imagebuilder:buildDate}}"
-          SourceAMI   = data.aws_ssm_parameter.al2023_ami.value
-        }
+        ami_tags = merge(var.tags, {
+          Pipeline  = "ami-image-builder"
+          BuildDate = "{{imagebuilder:buildDate}}"
+          SourceAMI = data.aws_ssm_parameter.al2023_ami.value
+        })
 
         launch_permission {
           user_ids = length(var.trusted_account_ids) > 0 ? concat(

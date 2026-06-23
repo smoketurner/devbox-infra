@@ -13,9 +13,7 @@ locals {
   tags = merge(
     var.tags,
     {
-      Pool        = var.pool_id
-      Environment = var.environment
-      ManagedBy   = "terraform"
+      Pool = var.pool_id
     }
   )
 }

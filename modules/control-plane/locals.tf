@@ -26,9 +26,7 @@ locals {
   tags = merge(
     var.tags,
     {
-      Component   = "control-plane"
-      Environment = var.environment
-      ManagedBy   = "terraform"
+      Component = "control-plane"
     }
   )
 }

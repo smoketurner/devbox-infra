@@ -10,9 +10,7 @@ locals {
   tags = merge(
     var.tags,
     {
-      Pipeline    = "ami-image-builder"
-      Environment = var.environment
-      ManagedBy   = "terraform"
+      Pipeline = "ami-image-builder"
     }
   )
 }

@@ -3,11 +3,6 @@ variable "name_prefix" {
   type        = string
 }
 
-variable "environment" {
-  description = "Environment name (e.g., dev)"
-  type        = string
-}
-
 variable "vpc_id" {
   description = "VPC the NLB and Fargate service run in (a dedicated control-plane VPC with a public subnet + internet gateway)"
   type        = string

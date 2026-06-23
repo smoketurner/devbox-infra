@@ -3,11 +3,6 @@ variable "name_prefix" {
   type        = string
 }
 
-variable "environment" {
-  description = "Environment name (e.g., dev)"
-  type        = string
-}
-
 variable "egress_vpc_id" {
   description = "VPC ID from the egress module where build instances run"
   type        = string

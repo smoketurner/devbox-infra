@@ -19,8 +19,13 @@ locals {
   cp_vpc_cidr       = "10.2.0.0/16"
   cp_public_subnets = [cidrsubnet(local.cp_vpc_cidr, 8, 1)]
 
-  tags = {
+  # Common tags applied to every resource via the provider's default_tags, and
+  # passed explicitly to the modules whose tags default_tags can't reach: the
+  # Image Builder AMI (created by the service) and pool EC2 instances (tagged via
+  # launch-template tag_specifications / ASG propagate_at_launch).
+  common_tags = {
+    Application = "devbox"
     Environment = local.environment
-    ManagedBy   = "terraform"
+    Terraform   = "true"
   }
 }
