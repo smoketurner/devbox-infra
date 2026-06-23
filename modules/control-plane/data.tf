@@ -23,11 +23,17 @@ data "aws_iam_policy" "ecs_task_execution" {
 # Task (runtime) role: the adopt-only control plane.
 data "aws_iam_policy_document" "task" {
   statement {
-    sid    = "AutoScalingActions"
+    sid       = "AutoScalingDescribe"
+    effect    = "Allow"
+    actions   = ["autoscaling:DescribeAutoScalingGroups"]
+    resources = ["*"] # Describe* is account-level; no resource-level scoping
+  }
+
+  statement {
+    sid    = "AutoScalingManage"
     effect = "Allow"
     actions = [
-      "autoscaling:DescribeAutoScalingGroups",
-      "autoscaling:SetDesiredCapacity",
+      "autoscaling:UpdateAutoScalingGroup", # reconciler sets desired_capacity
       "autoscaling:TerminateInstanceInAutoScalingGroup",
       "autoscaling:SetInstanceProtection",
     ]

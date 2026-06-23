@@ -18,6 +18,21 @@ output "private_subnets" {
   value       = module.vpc.private_subnets
 }
 
+output "public_subnets" {
+  description = "List of IDs of public subnets"
+  value       = module.vpc.public_subnets
+}
+
+output "nat_eni_id" {
+  description = "ID of the fck-nat instance's network interface"
+  value       = module.fck_nat.eni_id
+}
+
+output "nat_security_group_id" {
+  description = "ID of the security group attached to the fck-nat instance"
+  value       = aws_security_group.fck_nat.id
+}
+
 output "private_subnet_cidr_blocks" {
   description = "List of CIDR blocks of private subnets"
   value       = module.vpc.private_subnets_cidr_blocks

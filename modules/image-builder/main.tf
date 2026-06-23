@@ -27,7 +27,7 @@ resource "aws_kms_alias" "ami" {
 resource "aws_imagebuilder_image_recipe" "this" {
   name         = "${local.name_prefix}-recipe"
   parent_image = data.aws_ssm_parameter.al2023_ami.value
-  version      = "1.0.4"
+  version      = "1.0.5"
 
   dynamic "component" {
     for_each = sort(keys(local.component_map))
@@ -65,7 +65,7 @@ resource "aws_imagebuilder_infrastructure_configuration" "this" {
   instance_profile_name         = aws_iam_instance_profile.build_instance.name
   instance_types                = [var.build_instance_type]
   security_group_ids            = [aws_security_group.build.id]
-  subnet_id                     = var.egress_subnet_ids[0]
+  subnet_id                     = var.build_subnet_ids[0]
   terminate_instance_on_failure = true
 
   instance_metadata_options {

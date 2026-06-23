@@ -3,18 +3,18 @@ variable "name_prefix" {
   type        = string
 }
 
-variable "egress_vpc_id" {
-  description = "VPC ID from the egress module where build instances run"
+variable "build_vpc_id" {
+  description = "VPC ID where build instances run"
   type        = string
 }
 
-variable "egress_subnet_ids" {
-  description = "Private subnet IDs from egress VPC for build instances"
+variable "build_subnet_ids" {
+  description = "Private subnet IDs for build instances (must have NAT egress for package downloads)"
   type        = list(string)
 
   validation {
-    condition     = length(var.egress_subnet_ids) > 0
-    error_message = "At least one egress subnet ID must be provided."
+    condition     = length(var.build_subnet_ids) > 0
+    error_message = "At least one build subnet ID must be provided."
   }
 }
 

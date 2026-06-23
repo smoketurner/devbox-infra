@@ -1,7 +1,7 @@
 resource "aws_security_group" "build" {
   name        = "${local.name_prefix}-build"
   description = "Security group for Image Builder build instances"
-  vpc_id      = var.egress_vpc_id
+  vpc_id      = var.build_vpc_id
 
   tags = merge(local.tags, {
     Name = "${local.name_prefix}-build"

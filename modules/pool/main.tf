@@ -38,8 +38,9 @@ resource "aws_vpc_security_group_egress_rule" "https" {
 resource "aws_launch_template" "pool" {
   name = "${local.name_prefix}-lt"
 
-  image_id      = "resolve:ssm:${var.ssm_ami_parameter}"
-  instance_type = var.instance_type
+  image_id = "resolve:ssm:${var.ssm_ami_parameter}"
+  # No instance_type: the ASG's mixed-instances policy selects types by
+  # attributes (vCPU/memory) below.
 
   iam_instance_profile {
     arn = aws_iam_instance_profile.host.arn
@@ -94,9 +95,43 @@ resource "aws_launch_template" "pool" {
 resource "aws_autoscaling_group" "pool" {
   name = local.asg_name
 
-  launch_template {
-    id      = aws_launch_template.pool.id
-    version = "$Latest"
+  # Spot-only, with attribute-based instance selection across many Graviton
+  # types for capacity-pool diversity. capacity_rebalance proactively launches a
+  # replacement on a rebalance recommendation, ahead of the hard 2-minute
+  # interruption notice.
+  capacity_rebalance = true
+
+  mixed_instances_policy {
+    launch_template {
+      launch_template_specification {
+        launch_template_id = aws_launch_template.pool.id
+        version            = "$Latest"
+      }
+
+      override {
+        instance_requirements {
+          vcpu_count {
+            min = var.vcpu_count.min
+            max = var.vcpu_count.max
+          }
+
+          memory_mib {
+            min = var.memory_mib.min
+            max = var.memory_mib.max
+          }
+
+          cpu_manufacturers     = ["amazon-web-services"] # Graviton (arm64) only
+          burstable_performance = "included"              # allow t4g
+          instance_generations  = ["current"]
+        }
+      }
+    }
+
+    instances_distribution {
+      on_demand_base_capacity                  = 0
+      on_demand_percentage_above_base_capacity = 0 # 100% spot
+      spot_allocation_strategy                 = "price-capacity-optimized"
+    }
   }
 
   min_size         = var.min_size

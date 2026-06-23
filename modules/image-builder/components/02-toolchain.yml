@@ -116,14 +116,7 @@ phases:
                   "max-size": "50m",
                   "max-file": "3"
                 },
-                "storage-driver": "overlay2",
-                "default-ulimits": {
-                  "nofile": {
-                    "Name": "nofile",
-                    "Hard": 65536,
-                    "Soft": 65536
-                  }
-                }
+                "storage-driver": "overlay2"
               }
               EOF
       - name: InstallDockerCompose
@@ -169,3 +162,7 @@ phases:
             - docker compose version || exit 1
             - docker buildx version || exit 1
             - systemctl is-enabled docker || exit 1
+            # Actually start the daemon so a broken daemon.json can't ship: a
+            # version check alone passed even when dockerd refused to boot.
+            - systemctl start docker || exit 1
+            - timeout 30 docker info || exit 1

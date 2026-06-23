@@ -6,29 +6,15 @@ module "vpc" {
 
   azs             = local.azs
   private_subnets = local.private_subnets
-}
-
-module "egress" {
-  source = "../../modules/egress"
-
-  name = "devbox-${local.environment}-egress"
-  cidr = local.egress_vpc_cidr
-
-  azs             = local.azs
-  private_subnets = local.egress_private_subnets
-  public_subnets  = local.egress_public_subnets
-
-  # Associate VPC endpoints with the workload VPC for shared DNS resolution
-  associated_vpc_ids   = { workload = module.vpc.vpc_id }
-  associated_vpc_cidrs = [local.vpc_cidr]
+  public_subnets  = local.public_subnets
 }
 
 module "image_builder" {
   source = "../../modules/image-builder"
 
-  name_prefix       = "devbox-${local.environment}"
-  egress_vpc_id     = module.egress.vpc_id
-  egress_subnet_ids = module.egress.private_subnets
+  name_prefix      = "devbox-${local.environment}"
+  build_vpc_id     = module.vpc.vpc_id
+  build_subnet_ids = module.vpc.private_subnets
 
   component_files = [
     "01-base.yml",
@@ -41,24 +27,6 @@ module "image_builder" {
   tags = local.common_tags
 }
 
-# Temporary: VPC peering to allow workload VPC egress through the egress VPC's NAT instance.
-# This will be replaced by Transit Gateway or Network Firewall Proxy endpoints.
-module "vpc_peering" {
-  source = "../../modules/vpc-peering"
-
-  name = "devbox-${local.environment}-workload-to-egress"
-
-  requester_vpc_id          = module.vpc.vpc_id
-  requester_cidr_block      = module.vpc.vpc_cidr_block
-  requester_ipv6_cidr_block = module.vpc.vpc_ipv6_cidr_block
-  requester_route_table_ids = module.vpc.private_route_table_ids
-
-  accepter_vpc_id          = module.egress.vpc_id
-  accepter_cidr_block      = module.egress.vpc_cidr_block
-  accepter_ipv6_cidr_block = module.egress.vpc_ipv6_cidr_block
-  accepter_route_table_ids = module.egress.private_route_table_ids
-}
-
 module "pool" {
   source = "../../modules/pool"
 
@@ -68,6 +36,12 @@ module "pool" {
   vpc_id             = module.vpc.vpc_id
   subnet_ids         = module.vpc.private_subnets
   security_group_ids = []
+
+  # Cap the pool: the reconciler sets desired_capacity to
+  # min(claimed + POOL_TARGET_WARM_SIZE, max_size). With POOL_TARGET_WARM_SIZE=2,
+  # max_size = 1 holds a single warm instance. Instance types are chosen by the
+  # pool module's vcpu_count/memory_mib attribute ranges (spot, Graviton).
+  max_size = 1
 
   # Consume the parameter name from image-builder so Terraform orders the
   # parameter's creation before the launch template's resolve:ssm reference.

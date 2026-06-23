@@ -8,14 +8,9 @@ output "private_subnets" {
   value       = module.vpc.private_subnets
 }
 
-output "egress_vpc_id" {
-  description = "The ID of the egress VPC"
-  value       = module.egress.vpc_id
-}
-
-output "egress_nat_eni_id" {
-  description = "Network interface ID of the fck-nat instance in the egress VPC"
-  value       = module.egress.nat_eni_id
+output "nat_eni_id" {
+  description = "Network interface ID of the fck-nat instance providing workload egress"
+  value       = module.vpc.nat_eni_id
 }
 
 output "image_builder_pipeline_arn" {

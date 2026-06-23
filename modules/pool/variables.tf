@@ -23,10 +23,32 @@ variable "subnet_ids" {
   }
 }
 
-variable "instance_type" {
-  description = "EC2 instance type (arm64/Graviton)"
-  type        = string
-  default     = "m7g.large"
+# The spot pool uses attribute-based instance selection: instead of pinning
+# instance types, the ASG picks any current-gen Graviton (arm64) type within
+# these vCPU/memory ranges. A wider range spans more spot capacity pools, which
+# means fewer interruptions — the main resilience lever in a single AZ.
+variable "vcpu_count" {
+  description = "vCPU range (min/max) for attribute-based spot instance selection."
+  type = object({
+    min = number
+    max = number
+  })
+  default = {
+    min = 2
+    max = 4
+  }
+}
+
+variable "memory_mib" {
+  description = "Memory range in MiB (min/max) for attribute-based spot instance selection."
+  type = object({
+    min = number
+    max = number
+  })
+  default = {
+    min = 2048
+    max = 8192
+  }
 }
 
 variable "min_size" {

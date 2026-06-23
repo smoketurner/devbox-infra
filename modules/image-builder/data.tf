@@ -72,6 +72,7 @@ data "aws_iam_policy_document" "lifecycle" {
     actions = [
       "ec2:DeregisterImage",
       "ec2:DescribeImages",
+      "ec2:DescribeImageAttribute",
       "ec2:DeleteSnapshot",
       "ec2:DescribeSnapshots",
       "imagebuilder:DeleteImage",
@@ -162,6 +163,48 @@ data "aws_iam_policy_document" "kms_key" {
     ]
 
     resources = ["*"]
+  }
+
+  # Allow the EC2 Auto Scaling service-linked role to use the key when launching
+  # pool instances from CMK-encrypted AMI snapshots. CreateGrant is split out
+  # because it carries the GrantIsForAWSResource condition.
+  statement {
+    sid    = "AllowAutoScalingUse"
+    effect = "Allow"
+
+    principals {
+      type        = "AWS"
+      identifiers = [local.autoscaling_slr_arn]
+    }
+
+    actions = [
+      "kms:Encrypt",
+      "kms:Decrypt",
+      "kms:ReEncrypt*",
+      "kms:GenerateDataKey*",
+      "kms:DescribeKey",
+    ]
+
+    resources = ["*"]
+  }
+
+  statement {
+    sid    = "AllowAutoScalingCreateGrant"
+    effect = "Allow"
+
+    principals {
+      type        = "AWS"
+      identifiers = [local.autoscaling_slr_arn]
+    }
+
+    actions   = ["kms:CreateGrant"]
+    resources = ["*"]
+
+    condition {
+      test     = "Bool"
+      variable = "kms:GrantIsForAWSResource"
+      values   = ["true"]
+    }
   }
 
   # Allow trusted accounts to use the key (for cross-account AMI sharing)
