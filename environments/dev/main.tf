@@ -117,10 +117,8 @@ module "control_plane" {
   # GitHub Actions pushes images + deploys via this OIDC-federated role.
   github_repository = "smoketurner/devbox"
 
-  # OIDC endpoints default to Vouch. Register two apps: a confidential dashboard app
-  # (redirect URI https://<domain_name>/oauth2/idpresponse) for the ALB, and a public
-  # CLI app (device-code) whose client ID the server validates API tokens against.
+  # OIDC endpoints default to Vouch. The confidential dashboard app (redirect URI
+  # https://<domain_name>/oauth2/idpresponse) drives the app-side login flow.
   oidc_client_id     = var.oidc_client_id
   oidc_client_secret = var.oidc_client_secret
-  cli_client_id      = var.cli_client_id
 }

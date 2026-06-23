@@ -101,10 +101,10 @@ variable "ssl_policy" {
 # flow), not by the load balancer (the NLB is L4). oidc_client_id,
 # oidc_client_secret, oidc_authorization_endpoint, oidc_token_endpoint, and
 # oidc_scope feed that flow (see the AUTH_OIDC_* env in ecs.tf); the server
-# validates API bearer tokens with oidc_issuer, oidc_jwks_uri, and cli_client_id.
-# The owner/Unix login is derived from the token's email claim (no configurable
-# principal claim). oidc_user_info_endpoint is currently unused (the flow reads
-# the ID token directly).
+# validates API bearer tokens with oidc_issuer and oidc_jwks_uri (issuer-only,
+# audience not checked). The owner/Unix login is derived from the token's email
+# claim (no configurable principal claim). oidc_user_info_endpoint is currently
+# unused (the flow reads the ID token directly).
 #
 # OIDC endpoints default to Vouch (https://vouch.sh/docs/applications/). See the
 # Vouch discovery document: https://us.vouch.sh/.well-known/openid-configuration
@@ -147,12 +147,6 @@ variable "oidc_client_secret" {
   description = "Client secret for the dashboard Vouch app (source from a secrets backend / TF_VAR, never commit)"
   type        = string
   sensitive   = true
-}
-
-variable "cli_client_id" {
-  description = "Client ID of the public Vouch app the CLI/agents use (device-code flow); the server validates API bearer-token audience against it. Empty skips audience validation (any valid Vouch token from the issuer is accepted)."
-  type        = string
-  default     = ""
 }
 
 variable "oidc_scope" {

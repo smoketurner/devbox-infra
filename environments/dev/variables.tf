@@ -18,9 +18,3 @@ variable "oidc_client_secret" {
   type        = string
   sensitive   = true
 }
-
-variable "cli_client_id" {
-  description = "Client ID of the public CLI Vouch app (device-code); the server checks API bearer-token audience against it. Empty skips the audience check (issuer-only)."
-  type        = string
-  default     = ""
-}

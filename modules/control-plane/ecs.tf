@@ -48,12 +48,10 @@ resource "aws_ecs_task_definition" "server" {
       { name = "POOL_ID", value = var.pool_id },
       { name = "POOL_TARGET_WARM_SIZE", value = tostring(var.target_warm_pool_size) },
       { name = "RUST_LOG", value = "info,devbox_server=info" },
-      # API authentication: the server validates Vouch bearer tokens app-side.
-      # AUTH_OIDC_AUDIENCE is the CLI app's client ID (the API token audience).
-      { name = "AUTH_ENABLED", value = "true" },
+      # API authentication is always on server-side (no toggle): it validates
+      # Vouch bearer tokens app-side using issuer + JWKS (audience not checked).
       { name = "AUTH_OIDC_ISSUER", value = var.oidc_issuer },
       { name = "AUTH_OIDC_JWKS_URI", value = var.oidc_jwks_uri },
-      { name = "AUTH_OIDC_AUDIENCE", value = var.cli_client_id },
       # Dashboard login: app-side OIDC Authorization Code flow (the NLB is L4 and
       # can't gate it). Presence of CLIENT_ID/SECRET/REDIRECT_URI enables it; the
       # secret is injected from an encrypted SSM parameter (see `secrets` + oidc.tf).
