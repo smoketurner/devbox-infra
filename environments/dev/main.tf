@@ -37,10 +37,11 @@ module "pool" {
   subnet_ids         = module.vpc.private_subnets
   security_group_ids = []
 
+  instance_type = "t4g.small"
+
   # Cap the pool: the reconciler sets desired_capacity to
   # min(claimed + POOL_TARGET_WARM_SIZE, max_size). With POOL_TARGET_WARM_SIZE=2,
-  # max_size = 1 holds a single warm instance. Instance types are chosen by the
-  # pool module's vcpu_count/memory_mib attribute ranges (spot, Graviton).
+  # max_size = 1 holds a single warm instance.
   max_size = 1
 
   # Consume the parameter name from image-builder so Terraform orders the
