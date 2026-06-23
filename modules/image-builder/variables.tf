@@ -81,7 +81,7 @@ variable "ami_name_pattern" {
 }
 
 variable "ssm_parameter_path" {
-  description = "SSM Parameter Store path for publishing the latest AMI ID"
+  description = "SSM Parameter Store path for publishing the latest AMI ID. The pipeline execution role is granted ssm:PutParameter on exactly this path."
   type        = string
   default     = "/devbox/ami/latest"
 

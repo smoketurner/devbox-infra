@@ -69,6 +69,10 @@ module "pool" {
   subnet_ids         = module.vpc.private_subnets
   security_group_ids = []
 
+  # Consume the parameter name from image-builder so Terraform orders the
+  # parameter's creation before the launch template's resolve:ssm reference.
+  ssm_ami_parameter = module.image_builder.ssm_parameter_name
+
   tags = local.common_tags
 }
 

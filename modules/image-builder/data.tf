@@ -13,6 +13,12 @@ data "aws_iam_policy" "ssm_core" {
   name = "AmazonSSMManagedInstanceCore"
 }
 
+# Baseline workflow permissions for the pipeline execution role (replaces the
+# AWSServiceRoleForImageBuilder service-linked role for build/test/distribution).
+data "aws_iam_policy" "execution" {
+  name = "EC2ImageBuilderExecutionPolicy"
+}
+
 # IAM policy documents
 data "aws_iam_policy_document" "build_instance_assume_role" {
   statement {
@@ -46,7 +52,7 @@ data "aws_iam_policy_document" "secrets_access" {
   }
 }
 
-data "aws_iam_policy_document" "lifecycle_assume_role" {
+data "aws_iam_policy_document" "imagebuilder_assume_role" {
   statement {
     effect  = "Allow"
     actions = ["sts:AssumeRole"]
@@ -68,6 +74,7 @@ data "aws_iam_policy_document" "lifecycle" {
       "ec2:DescribeImages",
       "ec2:DeleteSnapshot",
       "ec2:DescribeSnapshots",
+      "imagebuilder:DeleteImage",
       "imagebuilder:GetImage",
       "imagebuilder:ListImages",
       "tag:GetResources",
@@ -83,8 +90,12 @@ data "aws_iam_policy_document" "lifecycle" {
   }
 }
 
-data "aws_iam_policy_document" "ssm_publish" {
+# Feature permissions added to the execution role beyond the managed baseline:
+# publish the output AMI ID to the SSM parameter during distribution, and
+# describe images so Systems Manager can validate the aws:ec2:image value.
+data "aws_iam_policy_document" "execution" {
   statement {
+    sid       = "PublishAmiParameter"
     effect    = "Allow"
     actions   = ["ssm:PutParameter"]
     resources = ["arn:${local.aws_partition}:ssm:${local.aws_region}:${local.aws_account_id}:parameter${var.ssm_parameter_path}"]

@@ -44,20 +44,40 @@ resource "aws_iam_role_policy" "secrets_access" {
   policy = data.aws_iam_policy_document.secrets_access[0].json
 }
 
-# Custom inline policy: SSM Parameter Store publish for native AMI distribution
-resource "aws_iam_role_policy" "ssm_publish" {
-  name = "${local.name_prefix}-ssm-publish"
-  role = aws_iam_role.build_instance.id
-
-  policy = data.aws_iam_policy_document.ssm_publish.json
-}
-
 # Instance profile wrapping the build instance role
 resource "aws_iam_instance_profile" "build_instance" {
   name = "${local.name_prefix}-instance-profile"
   role = aws_iam_role.build_instance.name
 
   tags = local.tags
+}
+
+# Pipeline Execution Role
+#
+# The pipeline runs its build, test, and distribution workflows under this role
+# instead of the AWSServiceRoleForImageBuilder service-linked role. The managed
+# EC2ImageBuilderExecutionPolicy provides the baseline workflow permissions; the
+# inline policy adds ssm:PutParameter so distribution can publish the output AMI
+# ID to /devbox/ami/latest, which the service-linked role cannot write because it
+# is outside the /imagebuilder/ namespace.
+
+resource "aws_iam_role" "execution" {
+  name               = "${local.name_prefix}-execution"
+  assume_role_policy = data.aws_iam_policy_document.imagebuilder_assume_role.json
+
+  tags = local.tags
+}
+
+resource "aws_iam_role_policy_attachment" "execution" {
+  role       = aws_iam_role.execution.name
+  policy_arn = data.aws_iam_policy.execution.arn
+}
+
+resource "aws_iam_role_policy" "execution" {
+  name = "${local.name_prefix}-execution-features"
+  role = aws_iam_role.execution.id
+
+  policy = data.aws_iam_policy_document.execution.json
 }
 
 # Lifecycle Policy Execution Role
@@ -67,7 +87,7 @@ resource "aws_iam_instance_profile" "build_instance" {
 
 resource "aws_iam_role" "lifecycle" {
   name               = "${local.name_prefix}-lifecycle"
-  assume_role_policy = data.aws_iam_policy_document.lifecycle_assume_role.json
+  assume_role_policy = data.aws_iam_policy_document.imagebuilder_assume_role.json
 
   tags = local.tags
 }
