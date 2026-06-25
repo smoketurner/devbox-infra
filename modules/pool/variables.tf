@@ -108,12 +108,6 @@ variable "workspace_volume_size" {
   }
 }
 
-variable "workspace_volume_enabled" {
-  description = "Attach the workspace snapshot as a second volume. Set false on the first apply (before the snapshot-builder has published a real snapshot id), then true."
-  type        = bool
-  default     = true
-}
-
 variable "github_app_private_key_param_arn" {
   description = "ARN of the SSM SecureString parameter holding the GitHub App private key, which the warming agent reads on-box to mint a read-only fetch token. Empty grants no read access (unauthenticated fetch)."
   type        = string

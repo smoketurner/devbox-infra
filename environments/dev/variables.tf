@@ -48,3 +48,9 @@ variable "workspace_repos" {
     # Add the other main repos here.
   ]
 }
+
+variable "docker_images" {
+  description = "Container images pre-pulled into the AMI's /var/lib/docker at build time so first container use is warm. Refreshed on AMI rebuild."
+  type        = list(string)
+  default     = []
+}

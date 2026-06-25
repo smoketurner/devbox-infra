@@ -14,7 +14,6 @@ locals {
       "export DEVBOX_GH_APP_ID='{{ GitHubAppId }}'",
       "export DEVBOX_GH_INSTALLATION_ID='{{ GitHubAppInstallationId }}'",
       "export DEVBOX_MOUNT='{{ MountPoint }}'",
-      "export DEVBOX_RUN_WARM_HOOKS='{{ RunWarmHooks }}'",
       "bash <<'DEVBOX_CLONE_WARM_EOF'",
     ],
     [local.clone_warm_script],
@@ -99,12 +98,6 @@ resource "aws_ssm_document" "clone_warm" {
         type        = "String"
         description = "Workspace mount point"
         default     = "/workspace"
-      }
-      RunWarmHooks = {
-        type          = "String"
-        description   = "Run each repo's .devbox/warm.sh if present"
-        default       = "false"
-        allowedValues = ["true", "false"]
       }
     }
     mainSteps = [{
@@ -216,7 +209,6 @@ resource "aws_ssm_document" "snapshot_build" {
             GitHubAppId             = [var.github_app_id]
             GitHubAppInstallationId = [var.github_app_installation_id]
             MountPoint              = ["/workspace"]
-            RunWarmHooks            = [var.run_warm_hooks ? "true" : "false"]
           }
         }
         nextStep = "describeDataVolume"

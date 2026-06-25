@@ -6,9 +6,9 @@
 # the interpreter, AL2023 /bin/sh is bash). Inputs arrive as DEVBOX_* env vars set
 # by the run-command preamble.
 #
-# Source-only first cut: warm hooks run only when DEVBOX_RUN_WARM_HOOKS=true and a
-# repo ships an executable .devbox/warm.sh; heavy recompilation is otherwise left
-# to the claimant's incremental build against the cache dirs seeded here.
+# Warm hooks run for any repo that ships an executable .devbox/warm.sh; repos
+# without one are cloned source-only, leaving heavy recompilation to the claimant's
+# incremental build against the cache dirs seeded here.
 set -euo pipefail
 
 MOUNT="${DEVBOX_MOUNT:-/workspace}"
@@ -92,6 +92,32 @@ if [ -n "${DEVBOX_GH_KEY_PARAM:-}" ] && [ -n "${DEVBOX_GH_APP_ID:-}" ] && [ -n "
 fi
 export GIT_TERMINAL_PROMPT=0
 
+# Seed shared on-volume tool-home and cache dirs (must match /etc/environment in
+# the AMI) before cloning so warm hooks populate them; they ride the snapshot and
+# chown to the claimant with the rest of /workspace.
+mkdir -p \
+  "${MOUNT}/.cargo" \
+  "${MOUNT}/go/bin" \
+  "${MOUNT}/.cache/go/mod" \
+  "${MOUNT}/.cache/go/build" \
+  "${MOUNT}/.cache/uv" \
+  "${MOUNT}/.cache/pnpm"
+
+# Make the baked toolchains usable by warm hooks. The SSM run-command shell is
+# non-login and sources neither /etc/profile.d nor /etc/environment, so put the
+# toolchain on PATH and repoint every build cache at the workspace volume: a hook's
+# downloads and build output must ride the snapshot, not the ephemeral root disk.
+# shellcheck source=/dev/null
+[ -r /etc/profile.d/go.sh ] && . /etc/profile.d/go.sh
+# shellcheck source=/dev/null
+[ -r /etc/profile.d/rust.sh ] && . /etc/profile.d/rust.sh
+export CARGO_HOME="${MOUNT}/.cargo"
+export GOPATH="${MOUNT}/go"
+export GOMODCACHE="${MOUNT}/.cache/go/mod"
+export GOCACHE="${MOUNT}/.cache/go/build"
+export UV_CACHE_DIR="${MOUNT}/.cache/uv"
+export XDG_CACHE_HOME="${MOUNT}/.cache"
+
 # Clone each repo source-only (blobless partial clone bounds transfer/size).
 IFS=',' read -ra REPOS <<<"${DEVBOX_REPOS:-}"
 for url in "${REPOS[@]}"; do
@@ -102,21 +128,12 @@ for url in "${REPOS[@]}"; do
   echo "Cloning ${url} -> ${dest}"
   git ${git_auth[@]+"${git_auth[@]}"} -c protocol.version=2 \
     clone --filter=blob:none "$url" "$dest"
-  if [ "${DEVBOX_RUN_WARM_HOOKS:-false}" = "true" ] && [ -x "${dest}/.devbox/warm.sh" ]; then
+  if [ -x "${dest}/.devbox/warm.sh" ]; then
     echo "Running warm hook for ${name}"
     (cd "$dest" && timeout 1800 ./.devbox/warm.sh) || echo "WARNING: warm hook failed for ${name}" >&2
   fi
   git -C "$dest" gc --quiet || true
 done
-
-# Seed shared on-volume cache dirs (must match /etc/environment in the AMI). They
-# ride the snapshot and chown to the claimant with the rest of /workspace.
-mkdir -p \
-  "${MOUNT}/.cache/cargo" \
-  "${MOUNT}/.cache/go/mod" \
-  "${MOUNT}/.cache/go/build" \
-  "${MOUNT}/.cache/uv" \
-  "${MOUNT}/.cache/pnpm"
 
 # Scrub any credential material before snapshotting; never let a token ride the
 # snapshot.

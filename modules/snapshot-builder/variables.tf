@@ -79,12 +79,6 @@ variable "schedule_enabled" {
   default     = true
 }
 
-variable "run_warm_hooks" {
-  description = "Whether the builder runs each repo's executable .devbox/warm.sh (heavy build-cache warming). Off for the source-only first cut."
-  type        = bool
-  default     = false
-}
-
 variable "retention_count" {
   description = "Number of most-recent workspace snapshots to retain; older untagged snapshots are deleted each run"
   type        = number
