@@ -86,6 +86,40 @@ variable "ebs_encrypted" {
   default     = true
 }
 
+variable "workspace_snapshot_ssm_parameter" {
+  description = "SSM parameter path holding the latest workspace snapshot id (published by the snapshot-builder)"
+  type        = string
+  default     = "/devbox/workspace-snapshot/latest"
+
+  validation {
+    condition     = startswith(var.workspace_snapshot_ssm_parameter, "/")
+    error_message = "SSM parameter path must start with /."
+  }
+}
+
+variable "workspace_volume_size" {
+  description = "Size of the /workspace data volume in GB (must be >= the snapshot's volume size)"
+  type        = number
+  default     = 50
+
+  validation {
+    condition     = var.workspace_volume_size > 0
+    error_message = "Workspace volume size must be greater than 0."
+  }
+}
+
+variable "workspace_volume_enabled" {
+  description = "Attach the workspace snapshot as a second volume. Set false on the first apply (before the snapshot-builder has published a real snapshot id), then true."
+  type        = bool
+  default     = true
+}
+
+variable "github_app_private_key_param_arn" {
+  description = "ARN of the SSM SecureString parameter holding the GitHub App private key, which the warming agent reads on-box to mint a read-only fetch token. Empty grants no read access (unauthenticated fetch)."
+  type        = string
+  default     = ""
+}
+
 variable "metadata_hop_limit" {
   description = "IMDSv2 hop limit"
   type        = number

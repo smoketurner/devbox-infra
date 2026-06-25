@@ -18,3 +18,33 @@ variable "oidc_client_secret" {
   type        = string
   sensitive   = true
 }
+
+variable "github_app_id" {
+  description = "GitHub App ID (or Client ID) for the read-only workspace-freshening App; JWT issuer when minting installation tokens"
+  type        = string
+}
+
+variable "github_app_installation_id" {
+  description = "GitHub App installation ID (the org install) to mint read-only tokens against"
+  type        = string
+}
+
+variable "github_app_private_key" {
+  description = "GitHub App private key, base64-encoded PEM (single-line, avoids multiline-PEM pain in tfvars/TF_VAR). Decoded to the raw PEM before storage in SSM. Source via TF_VAR_github_app_private_key, never commit."
+  type        = string
+  sensitive   = true
+
+  validation {
+    condition     = can(base64decode(var.github_app_private_key))
+    error_message = "github_app_private_key must be a base64-encoded PEM."
+  }
+}
+
+variable "workspace_repos" {
+  description = "Git clone URLs seeded into the workspace snapshot, one checkout per repo under /workspace"
+  type        = list(string)
+  default = [
+    "https://github.com/smoketurner/devbox.git",
+    # Add the other main repos here.
+  ]
+}

@@ -63,6 +63,26 @@ resource "aws_launch_template" "pool" {
     }
   }
 
+  # Per-instance /workspace volume cloned from the latest workspace snapshot. EC2
+  # clones an independent encrypted volume for each instance at launch and deletes
+  # it on terminate. Encryption (and the CMK) is inherited from the snapshot, so
+  # `encrypted`/`kms_key_id` must NOT be set here (specifying them is rejected).
+  # The fs is labelled `workspace`; the AMI's workspace.mount mounts it by label.
+  dynamic "block_device_mappings" {
+    for_each = var.workspace_volume_enabled ? [1] : []
+
+    content {
+      device_name = "/dev/sdb"
+
+      ebs {
+        snapshot_id           = data.aws_ssm_parameter.workspace_snapshot[0].value
+        delete_on_termination = true
+        volume_size           = var.workspace_volume_size
+        volume_type           = "gp3"
+      }
+    }
+  }
+
   network_interfaces {
     associate_public_ip_address = false
     security_groups             = concat([aws_security_group.pool.id], var.security_group_ids)

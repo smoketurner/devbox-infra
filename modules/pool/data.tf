@@ -4,6 +4,15 @@ data "aws_caller_identity" "current" {}
 data "aws_partition" "current" {}
 data "aws_region" "current" {}
 
+# Resolve the workspace snapshot id at plan time. resolve:ssm is not valid for a
+# block-device-mapping snapshot_id (only the launch template's top-level
+# image_id), so a new snapshot enters the launch template on the next apply, which
+# bumps its version; the agent's warming-time git fetch closes the gap to HEAD.
+data "aws_ssm_parameter" "workspace_snapshot" {
+  count = var.workspace_volume_enabled ? 1 : 0
+  name  = var.workspace_snapshot_ssm_parameter
+}
+
 # AMI-refresh executor: assume-role trust for SSM Automation and EventBridge.
 data "aws_iam_policy_document" "ssm_assume_role" {
   statement {
@@ -109,6 +118,20 @@ data "aws_iam_policy_document" "host_runtime" {
       test     = "ForAllValues:StringEquals"
       variable = "aws:TagKeys"
       values   = ["devbox:ready"]
+    }
+  }
+
+  # The warming agent reads the GitHub App private key on-box to mint a 1h
+  # read-only installation token for the /workspace fetch (devbox-agent
+  # github_token.rs). SecureString on the default alias/aws/ssm key needs no
+  # explicit kms:Decrypt; add one only if the parameter moves to a CMK.
+  dynamic "statement" {
+    for_each = var.github_app_private_key_param_arn != "" ? [1] : []
+    content {
+      sid       = "ReadGitHubAppKey"
+      effect    = "Allow"
+      actions   = ["ssm:GetParameter"]
+      resources = [var.github_app_private_key_param_arn]
     }
   }
 }

@@ -138,6 +138,41 @@ variable "devbox_agent_sha256" {
   default     = ""
 }
 
+# Workspace-freshen config baked into the warmup service's EnvironmentFile
+# (/etc/devbox/warmup.env). The warmup systemd unit does not read /etc/environment,
+# so the agent's DEVBOX_GITHUB_* config must reach it here. All non-secret; the App
+# private key itself is read from SSM at warmup via the host instance profile.
+
+variable "github_app_id" {
+  description = "GitHub App ID / Client ID the warming agent uses as the JWT issuer. Empty disables authenticated fetch (public repos only)."
+  type        = string
+  default     = ""
+}
+
+variable "github_app_installation_id" {
+  description = "GitHub App installation ID the warming agent mints its token against. Empty disables authenticated fetch."
+  type        = string
+  default     = ""
+}
+
+variable "github_app_key_param" {
+  description = "Name of the SSM SecureString parameter holding the GitHub App private key, read on-box by the warming agent (DEVBOX_GITHUB_KEY_PARAM)."
+  type        = string
+  default     = ""
+}
+
+variable "require_workspace" {
+  description = "Bake DEVBOX_REQUIRE_WORKSPACE=1 so an empty /workspace (snapshot failed to attach) fails warmup and the box is reaped. Keep false until the workspace snapshot volume is wired into the pool."
+  type        = bool
+  default     = false
+}
+
+variable "warmup_fetch_timeout_secs" {
+  description = "Optional override for the agent's overall fetch budget (WARMUP_FETCH_TIMEOUT_SECS). Empty uses the agent default (120s)."
+  type        = string
+  default     = ""
+}
+
 variable "tags" {
   description = "Additional tags to apply to all resources"
   type        = map(string)

@@ -12,8 +12,13 @@ locals {
   component_data = {
     for key, f in local.component_map :
     key => endswith(f, ".tftpl") ? templatefile("${path.module}/components/${f}", {
-      agent_url    = var.devbox_agent_url
-      agent_sha256 = var.devbox_agent_sha256
+      agent_url                  = var.devbox_agent_url
+      agent_sha256               = var.devbox_agent_sha256
+      github_app_id              = var.github_app_id
+      github_app_installation_id = var.github_app_installation_id
+      github_app_key_param       = var.github_app_key_param
+      require_workspace          = var.require_workspace ? "1" : "0"
+      warmup_fetch_timeout_secs  = var.warmup_fetch_timeout_secs
     }) : file("${path.module}/components/${f}")
   }
 }
