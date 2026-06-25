@@ -43,10 +43,7 @@ variable "github_app_private_key" {
 variable "workspace_repos" {
   description = "Git clone URLs seeded into the workspace snapshot, one checkout per repo under /workspace"
   type        = list(string)
-  default = [
-    "https://github.com/smoketurner/devbox.git",
-    # Add the other main repos here.
-  ]
+  default = []
 }
 
 variable "docker_images" {
