@@ -24,6 +24,39 @@ module "image_builder" {
     "99-validation.yml",
   ]
 
+  # Bake the warming agent's GitHub App config into the AMI's warmup EnvironmentFile.
+  # require_workspace stays false until the snapshot volume is wired into the pool
+  # (below); flip it true once pool.workspace_volume_enabled is true so an empty
+  # /workspace then fails warmup and the box is reaped.
+  github_app_id              = var.github_app_id
+  github_app_installation_id = var.github_app_installation_id
+  github_app_key_param       = aws_ssm_parameter.github_app_private_key.name
+  require_workspace          = false
+
+  tags = local.common_tags
+}
+
+# Periodically builds an encrypted /workspace EBS snapshot (repos cloned near-HEAD,
+# source-only) from the golden AMI and publishes its id to SSM. The pool attaches
+# it as a second volume; the warming agent fetches the delta to HEAD.
+module "snapshot_builder" {
+  source = "../../modules/snapshot-builder"
+
+  name_prefix      = "devbox-${local.environment}"
+  build_vpc_id     = module.vpc.vpc_id
+  build_subnet_ids = module.vpc.private_subnets
+
+  # Build from the same golden AMI the pool runs, so warmed caches match the
+  # toolchain (orders after the AMI parameter exists).
+  ami_parameter = module.image_builder.ssm_parameter_name
+
+  repos = var.workspace_repos
+
+  github_app_private_key_param_arn  = aws_ssm_parameter.github_app_private_key.arn
+  github_app_private_key_param_name = aws_ssm_parameter.github_app_private_key.name
+  github_app_id                     = var.github_app_id
+  github_app_installation_id        = var.github_app_installation_id
+
   tags = local.common_tags
 }
 
@@ -47,6 +80,14 @@ module "pool" {
   # Consume the parameter name from image-builder so Terraform orders the
   # parameter's creation before the launch template's resolve:ssm reference.
   ssm_ami_parameter = module.image_builder.ssm_parameter_name
+
+  # Attach the workspace snapshot as a second volume. Keep workspace_volume_enabled
+  # = false on the first apply (the snapshot id is still the "none" placeholder);
+  # after the snapshot-builder publishes a real snapshot once, flip it to true (and
+  # set image_builder.require_workspace = true) and re-apply.
+  workspace_snapshot_ssm_parameter = module.snapshot_builder.ssm_parameter_name
+  workspace_volume_enabled         = false
+  github_app_private_key_param_arn = aws_ssm_parameter.github_app_private_key.arn
 
   tags = local.common_tags
 }
@@ -84,6 +125,11 @@ module "control_plane" {
   ingress_cidrs = ["0.0.0.0/0"]
 
   pool_id = "default"
+
+  # Single task in dev. A second task wouldn't double-reconcile — each tick gates
+  # on a TTL lock row in DSQL, so only one instance ever acts — it only added
+  # API/UI redundancy we don't need here.
+  desired_count = 1
 
   # Terraform issues the ACM cert and Route 53 alias for this hostname.
   domain_name     = var.domain_name

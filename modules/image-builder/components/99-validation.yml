@@ -55,6 +55,21 @@ phases:
             - /usr/local/sbin/devbox-agent --version || exit 1
             - test -d /workspace || exit 1
             - echo "Devbox agent validated"
+      - name: VerifyWorkspaceMount
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "=== Verifying workspace mount and warm-up env ==="
+            # The builder has no workspace data volume attached, so assert the unit
+            # is enabled (not active) and the config files exist; never assert the
+            # mount is active.
+            - systemctl is-enabled workspace.mount || exit 1
+            - grep -q "RequiresMountsFor=/workspace" /etc/systemd/system/devbox-warmup.service || exit 1
+            - grep -q "EnvironmentFile=-/etc/devbox/warmup.env" /etc/systemd/system/devbox-warmup.service || exit 1
+            - grep -q "CARGO_HOME=/workspace/.cache/cargo" /etc/environment || exit 1
+            - test -f /etc/devbox/warmup.env || exit 1
+            - grep -q "DEVBOX_GITHUB_KEY_PARAM=" /etc/devbox/warmup.env || exit 1
+            - echo "Workspace mount and warm-up env validated"
       - name: VerifyDiskSpace
         action: ExecuteBash
         inputs:

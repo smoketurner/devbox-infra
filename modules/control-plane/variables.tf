@@ -50,7 +50,7 @@ variable "container_port" {
 }
 
 variable "desired_count" {
-  description = "Number of Fargate tasks (the reconciler is leader-locked, so >1 is for API/UI availability)"
+  description = "Number of Fargate tasks (the reconciler gates each tick on a TTL lock row in DSQL so only one instance acts; >1 is for API/UI availability)"
   type        = number
   default     = 2
 }
@@ -99,43 +99,18 @@ variable "ssl_policy" {
 
 # Dashboard login is performed app-side by the server (OIDC Authorization Code
 # flow), not by the load balancer (the NLB is L4). oidc_client_id,
-# oidc_client_secret, oidc_authorization_endpoint, oidc_token_endpoint, and
-# oidc_scope feed that flow (see the AUTH_OIDC_* env in ecs.tf); the server
-# validates API bearer tokens with oidc_issuer and oidc_jwks_uri (issuer-only,
-# audience not checked). The owner/Unix login is derived from the token's email
-# claim (no configurable principal claim). oidc_user_info_endpoint is currently
-# unused (the flow reads the ID token directly).
+# oidc_client_secret, and oidc_scope feed that flow (see the AUTH_OIDC_* env in
+# ecs.tf); the server validates API bearer tokens with oidc_issuer (issuer-only,
+# audience not checked). The authorization, token, and JWKS endpoints are
+# discovered from the issuer's OIDC discovery document. The owner/Unix login is
+# derived from the token's email claim (no configurable principal claim).
 #
-# OIDC endpoints default to Vouch (https://vouch.sh/docs/applications/). See the
+# The issuer defaults to Vouch (https://vouch.sh/docs/applications/). See the
 # Vouch discovery document: https://us.vouch.sh/.well-known/openid-configuration
 variable "oidc_issuer" {
   description = "OIDC issuer URL"
   type        = string
   default     = "https://us.vouch.sh"
-}
-
-variable "oidc_authorization_endpoint" {
-  description = "OIDC authorization endpoint"
-  type        = string
-  default     = "https://us.vouch.sh/oauth/authorize"
-}
-
-variable "oidc_token_endpoint" {
-  description = "OIDC token endpoint"
-  type        = string
-  default     = "https://us.vouch.sh/oauth/token"
-}
-
-variable "oidc_user_info_endpoint" {
-  description = "OIDC user info endpoint"
-  type        = string
-  default     = "https://us.vouch.sh/oauth/userinfo"
-}
-
-variable "oidc_jwks_uri" {
-  description = "JWKS URI the server uses to validate bearer tokens (CLI/agents)"
-  type        = string
-  default     = "https://us.vouch.sh/oauth/jwks"
 }
 
 variable "oidc_client_id" {

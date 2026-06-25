@@ -16,3 +16,4 @@ terraform.rc
 # Never commit variable values — they may carry secrets (e.g. oidc_client_secret)
 *.tfvars
 *.tfvars.json
+*.pyc

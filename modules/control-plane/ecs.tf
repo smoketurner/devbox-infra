@@ -45,19 +45,19 @@ resource "aws_ecs_task_definition" "server" {
       { name = "DATABASE_URL", value = local.database_url },
       { name = "PORT", value = tostring(var.container_port) },
       { name = "AWS_REGION", value = local.aws_region },
+      { name = "AWS_ACCOUNT_ID", value = local.aws_account_id },
       { name = "POOL_ID", value = var.pool_id },
       { name = "POOL_TARGET_WARM_SIZE", value = tostring(var.target_warm_pool_size) },
       { name = "RUST_LOG", value = "info,devbox_server=info" },
       # API authentication is always on server-side (no toggle): it validates
-      # Vouch bearer tokens app-side using issuer + JWKS (audience not checked).
+      # Vouch bearer tokens app-side using the issuer (audience not checked); the
+      # JWKS URI is discovered from the issuer's OIDC discovery document.
       { name = "AUTH_OIDC_ISSUER", value = var.oidc_issuer },
-      { name = "AUTH_OIDC_JWKS_URI", value = var.oidc_jwks_uri },
       # Dashboard login: app-side OIDC Authorization Code flow (the NLB is L4 and
       # can't gate it). Presence of CLIENT_ID/SECRET/REDIRECT_URI enables it; the
       # secret is injected from an encrypted SSM parameter (see `secrets` + oidc.tf).
+      # Authorization/token endpoints are discovered from the issuer.
       { name = "AUTH_OIDC_CLIENT_ID", value = var.oidc_client_id },
-      { name = "AUTH_OIDC_AUTHORIZATION_ENDPOINT", value = var.oidc_authorization_endpoint },
-      { name = "AUTH_OIDC_TOKEN_ENDPOINT", value = var.oidc_token_endpoint },
       { name = "AUTH_OIDC_REDIRECT_URI", value = "https://${var.domain_name}/oauth2/idpresponse" },
       { name = "AUTH_OIDC_SCOPE", value = var.oidc_scope },
     ]
