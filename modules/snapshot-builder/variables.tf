@@ -107,6 +107,11 @@ variable "clone_warm_timeout_seconds" {
   }
 }
 
+variable "ami_kms_key_arn" {
+  description = "ARN of the KMS key the golden AMI's root snapshot is encrypted with (image-builder's CMK). The automation role calls RunInstances directly, so it must be able to use this key to launch the builder from the AMI; granted via IAM relying on the key's root-account delegation, which avoids a module cycle."
+  type        = string
+}
+
 variable "github_app_private_key_param_arn" {
   description = "ARN of the SSM SecureString parameter holding the GitHub App private key (PEM). The builder reads it to mint a read-only installation token for cloning."
   type        = string

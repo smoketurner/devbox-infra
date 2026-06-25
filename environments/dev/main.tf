@@ -47,8 +47,10 @@ module "snapshot_builder" {
   build_subnet_ids = module.vpc.private_subnets
 
   # Build from the same golden AMI the pool runs, so warmed caches match the
-  # toolchain (orders after the AMI parameter exists).
-  ami_parameter = module.image_builder.ssm_parameter_name
+  # toolchain (orders after the AMI parameter exists). The automation role needs
+  # the AMI's CMK to launch the builder from that encrypted image.
+  ami_parameter   = module.image_builder.ssm_parameter_name
+  ami_kms_key_arn = module.image_builder.kms_key_arn
 
   repos = var.workspace_repos
 

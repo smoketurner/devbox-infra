@@ -174,10 +174,13 @@ data "aws_iam_policy_document" "snapshot_automation" {
     }
   }
 
-  # Create the encrypted data volume at RunInstances (EC2 creates a grant on the
-  # caller's behalf) and inspect the key for CreateSnapshot.
+  # Use both CMKs when launching the builder: the image-builder AMI key for the
+  # golden AMI's encrypted root volume (RunInstances creates the launch grant), and
+  # the workspace key for the encrypted data volume + snapshot. The AMI key's
+  # policy can't list this role without a module cycle, so access to it goes
+  # through IAM + that key's root-account delegation.
   statement {
-    sid    = "UseWorkspaceKey"
+    sid    = "UseEncryptionKeys"
     effect = "Allow"
     actions = [
       "kms:Encrypt",
@@ -187,7 +190,7 @@ data "aws_iam_policy_document" "snapshot_automation" {
       "kms:DescribeKey",
       "kms:CreateGrant",
     ]
-    resources = [aws_kms_key.workspace.arn]
+    resources = [aws_kms_key.workspace.arn, var.ami_kms_key_arn]
   }
 }
 
@@ -256,13 +259,20 @@ data "aws_iam_policy_document" "kms_key" {
     resources = ["*"]
   }
 
+  # The builder instance profile (the volume is attached to it) and the automation
+  # role (the RunInstances caller that creates the EBS-encryption grant). EC2's EBS
+  # grant flow evaluates the key policy for the launching principal, so the
+  # automation role must be listed here, not only granted via IAM + root-enable.
   statement {
     sid    = "AllowBuilderUse"
     effect = "Allow"
 
     principals {
-      type        = "AWS"
-      identifiers = [aws_iam_role.builder_instance.arn]
+      type = "AWS"
+      identifiers = [
+        aws_iam_role.builder_instance.arn,
+        aws_iam_role.snapshot_automation.arn,
+      ]
     }
 
     actions = [
