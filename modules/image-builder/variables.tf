@@ -149,12 +149,6 @@ variable "github_app_id" {
   default     = ""
 }
 
-variable "github_app_installation_id" {
-  description = "GitHub App installation ID the warming agent mints its token against. Empty disables authenticated fetch."
-  type        = string
-  default     = ""
-}
-
 variable "github_app_key_param" {
   description = "Name of the SSM SecureString parameter holding the GitHub App private key, read on-box by the warming agent (DEVBOX_GITHUB_KEY_PARAM)."
   type        = string

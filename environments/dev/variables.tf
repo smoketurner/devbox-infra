@@ -24,11 +24,6 @@ variable "github_app_id" {
   type        = string
 }
 
-variable "github_app_installation_id" {
-  description = "GitHub App installation ID (the org install) to mint read-only tokens against"
-  type        = string
-}
-
 variable "github_app_private_key" {
   description = "GitHub App private key, base64-encoded PEM (single-line, avoids multiline-PEM pain in tfvars/TF_VAR). Decoded to the raw PEM before storage in SSM. Source via TF_VAR_github_app_private_key, never commit."
   type        = string
@@ -43,7 +38,7 @@ variable "github_app_private_key" {
 variable "workspace_repos" {
   description = "Git clone URLs seeded into the workspace snapshot, one checkout per repo under /workspace"
   type        = list(string)
-  default = []
+  default     = []
 }
 
 variable "docker_images" {

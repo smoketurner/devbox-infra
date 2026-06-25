@@ -26,9 +26,8 @@ module "image_builder" {
   ]
 
   # Bake the warming agent's GitHub App config into the AMI's warmup EnvironmentFile.
-  github_app_id              = var.github_app_id
-  github_app_installation_id = var.github_app_installation_id
-  github_app_key_param       = aws_ssm_parameter.github_app_private_key.name
+  github_app_id        = var.github_app_id
+  github_app_key_param = aws_ssm_parameter.github_app_private_key.name
 
   # Base images pre-pulled into the AMI's /var/lib/docker so first container use is
   # warm. Sizing: the recipe root volume (and pool ebs_volume_size) must hold these.
@@ -58,7 +57,6 @@ module "snapshot_builder" {
   github_app_private_key_param_arn  = aws_ssm_parameter.github_app_private_key.arn
   github_app_private_key_param_name = aws_ssm_parameter.github_app_private_key.name
   github_app_id                     = var.github_app_id
-  github_app_installation_id        = var.github_app_installation_id
 
   tags = local.common_tags
 }

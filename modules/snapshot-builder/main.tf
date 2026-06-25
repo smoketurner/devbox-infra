@@ -12,7 +12,6 @@ locals {
       "export DEVBOX_REPOS='{{ Repos }}'",
       "export DEVBOX_GH_KEY_PARAM='{{ GitHubAppKeyParam }}'",
       "export DEVBOX_GH_APP_ID='{{ GitHubAppId }}'",
-      "export DEVBOX_GH_INSTALLATION_ID='{{ GitHubAppInstallationId }}'",
       "export DEVBOX_MOUNT='{{ MountPoint }}'",
       "bash <<'DEVBOX_CLONE_WARM_EOF'",
     ],
@@ -87,11 +86,6 @@ resource "aws_ssm_document" "clone_warm" {
       GitHubAppId = {
         type        = "String"
         description = "GitHub App ID / Client ID (JWT issuer)"
-        default     = ""
-      }
-      GitHubAppInstallationId = {
-        type        = "String"
-        description = "GitHub App installation ID"
         default     = ""
       }
       MountPoint = {
@@ -204,11 +198,10 @@ resource "aws_ssm_document" "snapshot_build" {
             CloudWatchOutputEnabled = true
           }
           Parameters = {
-            Repos                   = [join(",", var.repos)]
-            GitHubAppKeyParam       = [var.github_app_private_key_param_name]
-            GitHubAppId             = [var.github_app_id]
-            GitHubAppInstallationId = [var.github_app_installation_id]
-            MountPoint              = ["/workspace"]
+            Repos             = [join(",", var.repos)]
+            GitHubAppKeyParam = [var.github_app_private_key_param_name]
+            GitHubAppId       = [var.github_app_id]
+            MountPoint        = ["/workspace"]
           }
         }
         nextStep = "describeDataVolume"

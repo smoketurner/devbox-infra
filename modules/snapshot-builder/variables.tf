@@ -122,12 +122,6 @@ variable "github_app_id" {
   default     = ""
 }
 
-variable "github_app_installation_id" {
-  description = "GitHub App installation ID to mint the token against. Empty disables authenticated cloning."
-  type        = string
-  default     = ""
-}
-
 variable "log_retention_days" {
   description = "CloudWatch log group retention period in days for builder run-command output"
   type        = number
