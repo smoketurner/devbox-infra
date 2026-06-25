@@ -57,10 +57,9 @@ phases:
             # Mount the per-instance snapshot volume at /workspace by filesystem
             # LABEL (the snapshot-builder formats it `workspace`), so the
             # non-deterministic NVMe device name on Nitro is irrelevant. nofail:
-            # if the volume did not attach, still boot so the agent can detect the
-            # empty workspace and fail warm-up loudly (DEVBOX_REQUIRE_WORKSPACE)
-            # rather than wedging local-fs.target. The filesystem rides the
-            # snapshot, so this never mkfs.
+            # if the volume did not attach, still boot and fall back to /workspace
+            # on the root volume (cold, root-volume-sized) rather than wedging
+            # local-fs.target. The filesystem rides the snapshot, so this never mkfs.
             - |
               cat > /etc/systemd/system/workspace.mount <<'EOF'
               [Unit]
@@ -76,13 +75,15 @@ phases:
               WantedBy=multi-user.target
               EOF
             # System-wide cache dirs on the data volume, read by PAM for the
-            # claimant's fresh useradd -m home (which ~/.cargo would miss). Paths
-            # match the snapshot-builder's on-volume layout. NOTE: /etc/profile.d/
-            # rust.sh sets CARGO_HOME=/opt/rust/cargo and takes precedence for
-            # login shells; reconciling that is part of the deferred heavy-warm work.
+            # claimant's login shells and fresh useradd -m home (which ~/.cargo
+            # would miss). Paths match the snapshot-builder's on-volume layout.
+            # /etc/profile.d/rust.sh deliberately sets only PATH/RUSTUP_HOME and
+            # leaves CARGO_HOME to this file, so the warmed on-volume cache wins.
             - |
               cat >> /etc/environment <<'EOF'
-              CARGO_HOME=/workspace/.cache/cargo
+              XDG_CACHE_HOME=/workspace/.cache
+              CARGO_HOME=/workspace/.cargo
+              GOPATH=/workspace/go
               GOMODCACHE=/workspace/.cache/go/mod
               GOCACHE=/workspace/.cache/go/build
               UV_CACHE_DIR=/workspace/.cache/uv
@@ -100,7 +101,6 @@ phases:
               DEVBOX_GITHUB_APP_ID=${github_app_id}
               DEVBOX_GITHUB_INSTALLATION_ID=${github_app_installation_id}
               DEVBOX_GITHUB_KEY_PARAM=${github_app_key_param}
-              DEVBOX_REQUIRE_WORKSPACE=${require_workspace}
               WARMUP_FETCH_TIMEOUT_SECS=${warmup_fetch_timeout_secs}
               EOF
             - chmod 0644 /etc/devbox/warmup.env

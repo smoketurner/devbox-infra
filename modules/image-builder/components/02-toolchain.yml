@@ -62,6 +62,14 @@ phases:
             - dnf install -y nodejs22 nodejs22-npm
             - npm install -g npm@latest
             - npm install -g yarn pnpm typescript
+      - name: InstallTailwindCSS
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Installing Tailwind CSS standalone CLI"
+            - "TAILWIND_VERSION=$(curl -s https://api.github.com/repos/tailwindlabs/tailwindcss/releases/latest | jq -r .tag_name)"
+            - "curl -fsSL \"https://github.com/tailwindlabs/tailwindcss/releases/download/${TAILWIND_VERSION}/tailwindcss-linux-arm64\" -o /usr/local/bin/tailwindcss"
+            - chmod +x /usr/local/bin/tailwindcss
       - name: InstallGo
         action: ExecuteBash
         inputs:
@@ -71,11 +79,13 @@ phases:
             - "curl -fsSL \"https://go.dev/dl/${GO_VERSION}.linux-arm64.tar.gz\" -o /tmp/go.tar.gz"
             - tar -C /usr/local -xzf /tmp/go.tar.gz
             - rm -f /tmp/go.tar.gz
+            # GOROOT's bin and the on-volume GOPATH bin (go install target) go on
+            # PATH here; GOPATH and the module/build caches live in /etc/environment
+            # so they ride the workspace volume for every session, login or not.
             - |
               cat > /etc/profile.d/go.sh <<'EOF'
               export GOROOT=/usr/local/go
-              export GOPATH=$HOME/go
-              export PATH=$GOROOT/bin:$GOPATH/bin:$PATH
+              export PATH=$GOROOT/bin:/workspace/go/bin:$PATH
               EOF
             - chmod 644 /etc/profile.d/go.sh
       - name: InstallRust
@@ -86,11 +96,15 @@ phases:
             - export RUSTUP_HOME=/opt/rust/rustup
             - export CARGO_HOME=/opt/rust/cargo
             - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile default
+            # PATH carries the rustup proxy binaries plus the on-volume
+            # cargo-install bin dir (cargo installs into $CARGO_HOME/bin); the
+            # proxies stay first so they can't be shadowed. CARGO_HOME (the cache)
+            # is left to /etc/environment (=/workspace/.cargo) so the warmed
+            # on-volume cache wins for login shells instead of resetting to /opt.
             - |
               cat > /etc/profile.d/rust.sh <<'EOF'
               export RUSTUP_HOME=/opt/rust/rustup
-              export CARGO_HOME=/opt/rust/cargo
-              export PATH=$CARGO_HOME/bin:$PATH
+              export PATH=/opt/rust/cargo/bin:/workspace/.cargo/bin:$PATH
               EOF
             - chmod 644 /etc/profile.d/rust.sh
             - source /etc/profile.d/rust.sh
@@ -158,6 +172,12 @@ phases:
             - go version || exit 1
             - rustc --version || exit 1
             - cargo --version || exit 1
+            # Compile a minimal stylesheet so a broken binary can't ship: a version
+            # print alone wouldn't exercise the bundled engine.
+            - printf '@import "tailwindcss";\n' > /tmp/tw-input.css
+            - timeout 60 /usr/local/bin/tailwindcss -i /tmp/tw-input.css -o /tmp/tw-output.css || exit 1
+            - test -s /tmp/tw-output.css || exit 1
+            - rm -f /tmp/tw-input.css /tmp/tw-output.css
             - docker --version || exit 1
             - docker compose version || exit 1
             - docker buildx version || exit 1

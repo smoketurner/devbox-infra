@@ -161,10 +161,10 @@ variable "github_app_key_param" {
   default     = ""
 }
 
-variable "require_workspace" {
-  description = "Bake DEVBOX_REQUIRE_WORKSPACE=1 so an empty /workspace (snapshot failed to attach) fails warmup and the box is reaped. Keep false until the workspace snapshot volume is wired into the pool."
-  type        = bool
-  default     = false
+variable "docker_images" {
+  description = "Container images pre-pulled into the AMI's /var/lib/docker at build time so first container use is warm. Refreshed on AMI rebuild."
+  type        = list(string)
+  default     = []
 }
 
 variable "warmup_fetch_timeout_secs" {

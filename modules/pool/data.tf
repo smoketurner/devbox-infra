@@ -9,8 +9,7 @@ data "aws_region" "current" {}
 # image_id), so a new snapshot enters the launch template on the next apply, which
 # bumps its version; the agent's warming-time git fetch closes the gap to HEAD.
 data "aws_ssm_parameter" "workspace_snapshot" {
-  count = var.workspace_volume_enabled ? 1 : 0
-  name  = var.workspace_snapshot_ssm_parameter
+  name = var.workspace_snapshot_ssm_parameter
 }
 
 # AMI-refresh executor: assume-role trust for SSM Automation and EventBridge.

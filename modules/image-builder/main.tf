@@ -27,7 +27,7 @@ resource "aws_kms_alias" "ami" {
 resource "aws_imagebuilder_image_recipe" "this" {
   name         = "${local.name_prefix}-recipe"
   parent_image = data.aws_ssm_parameter.al2023_ami.value
-  version      = "1.0.6"
+  version      = "1.0.7"
 
   dynamic "component" {
     for_each = sort(keys(local.component_map))
@@ -43,8 +43,10 @@ resource "aws_imagebuilder_image_recipe" "this" {
       delete_on_termination = true
       encrypted             = true
       kms_key_id            = aws_kms_key.ami.arn
-      volume_size           = 30
-      volume_type           = "gp3"
+      # Holds the OS, toolchains, and pre-pulled Docker images. Pool instances
+      # launched from this AMI must set ebs_volume_size >= this value.
+      volume_size = 100
+      volume_type = "gp3"
     }
   }
 

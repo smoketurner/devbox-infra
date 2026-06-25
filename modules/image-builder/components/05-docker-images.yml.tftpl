@@ -1,0 +1,33 @@
+name: DockerImages
+description: Pre-pull container images into the AMI image store so first container use is warm
+schemaVersion: 1.0
+phases:
+  - name: build
+    steps:
+      - name: PrePullImages
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Pre-pulling Docker images"
+            # Docker is installed and enabled in 02-toolchain but only started in
+            # its validate phase. Start it here so pulls land in /var/lib/docker on
+            # the root volume, which is captured into the AMI. With an empty list
+            # the loops below are no-ops.
+            - systemctl start docker
+            - timeout 60 bash -c 'until docker info >/dev/null 2>&1; do sleep 2; done'
+            - |
+              for img in ${docker_images}; do
+                echo "Pulling $img"
+                docker pull "$img" || exit 1
+              done
+  - name: validate
+    steps:
+      - name: ValidateImages
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Validating pre-pulled Docker images"
+            - |
+              for img in ${docker_images}; do
+                docker image inspect "$img" >/dev/null 2>&1 || { echo "missing image: $img" >&2; exit 1; }
+              done

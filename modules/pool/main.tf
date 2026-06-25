@@ -68,14 +68,17 @@ resource "aws_launch_template" "pool" {
   # it on terminate. Encryption (and the CMK) is inherited from the snapshot, so
   # `encrypted`/`kms_key_id` must NOT be set here (specifying them is rejected).
   # The fs is labelled `workspace`; the AMI's workspace.mount mounts it by label.
+  # Auto-attach only once the snapshot-builder has published a real snapshot id;
+  # while the parameter is still the "none" placeholder, instances launch without
+  # the volume and fall back to /workspace on the root volume.
   dynamic "block_device_mappings" {
-    for_each = var.workspace_volume_enabled ? [1] : []
+    for_each = startswith(data.aws_ssm_parameter.workspace_snapshot.value, "snap-") ? [1] : []
 
     content {
       device_name = "/dev/sdb"
 
       ebs {
-        snapshot_id           = data.aws_ssm_parameter.workspace_snapshot[0].value
+        snapshot_id           = data.aws_ssm_parameter.workspace_snapshot.value
         delete_on_termination = true
         volume_size           = var.workspace_volume_size
         volume_type           = "gp3"

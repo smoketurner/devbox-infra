@@ -17,8 +17,8 @@ locals {
       github_app_id              = var.github_app_id
       github_app_installation_id = var.github_app_installation_id
       github_app_key_param       = var.github_app_key_param
-      require_workspace          = var.require_workspace ? "1" : "0"
       warmup_fetch_timeout_secs  = var.warmup_fetch_timeout_secs
+      docker_images              = join(" ", var.docker_images)
     }) : file("${path.module}/components/${f}")
   }
 }

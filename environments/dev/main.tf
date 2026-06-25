@@ -21,17 +21,18 @@ module "image_builder" {
     "02-toolchain.yml",
     "03-repos.yml",
     "04-devbox.yml.tftpl",
+    "05-docker-images.yml.tftpl",
     "99-validation.yml",
   ]
 
   # Bake the warming agent's GitHub App config into the AMI's warmup EnvironmentFile.
-  # require_workspace stays false until the snapshot volume is wired into the pool
-  # (below); flip it true once pool.workspace_volume_enabled is true so an empty
-  # /workspace then fails warmup and the box is reaped.
   github_app_id              = var.github_app_id
   github_app_installation_id = var.github_app_installation_id
   github_app_key_param       = aws_ssm_parameter.github_app_private_key.name
-  require_workspace          = false
+
+  # Base images pre-pulled into the AMI's /var/lib/docker so first container use is
+  # warm. Sizing: the recipe root volume (and pool ebs_volume_size) must hold these.
+  docker_images = var.docker_images
 
   tags = local.common_tags
 }
@@ -74,6 +75,10 @@ module "pool" {
 
   instance_type = "t4g.small"
 
+  # Root volume must be >= the AMI's root snapshot, which is 100GB to hold the
+  # pre-pulled Docker images (see image_builder recipe volume_size).
+  ebs_volume_size = 100
+
   # Cap the pool: the reconciler sets desired_capacity to
   # min(claimed + POOL_TARGET_WARM_SIZE, max_size). With POOL_TARGET_WARM_SIZE=2,
   # max_size = 1 holds a single warm instance.
@@ -83,12 +88,12 @@ module "pool" {
   # parameter's creation before the launch template's resolve:ssm reference.
   ssm_ami_parameter = module.image_builder.ssm_parameter_name
 
-  # Attach the workspace snapshot as a second volume. Keep workspace_volume_enabled
-  # = false on the first apply (the snapshot id is still the "none" placeholder);
-  # after the snapshot-builder publishes a real snapshot once, flip it to true (and
-  # set image_builder.require_workspace = true) and re-apply.
+  # The pool auto-attaches the workspace snapshot as a second volume once the
+  # snapshot-builder has published a real snapshot id (until then the parameter is
+  # the "none" placeholder and instances launch with /workspace on the root volume).
+  # A new snapshot id enters the Launch Template on the next apply; if the volume
+  # fails to attach at runtime, the box falls back to /workspace on root (cold).
   workspace_snapshot_ssm_parameter = module.snapshot_builder.ssm_parameter_name
-  workspace_volume_enabled         = false
   github_app_private_key_param_arn = aws_ssm_parameter.github_app_private_key.arn
 
   tags = local.common_tags

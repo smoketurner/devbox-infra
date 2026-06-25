@@ -66,7 +66,9 @@ phases:
             - systemctl is-enabled workspace.mount || exit 1
             - grep -q "RequiresMountsFor=/workspace" /etc/systemd/system/devbox-warmup.service || exit 1
             - grep -q "EnvironmentFile=-/etc/devbox/warmup.env" /etc/systemd/system/devbox-warmup.service || exit 1
-            - grep -q "CARGO_HOME=/workspace/.cache/cargo" /etc/environment || exit 1
+            - grep -q "XDG_CACHE_HOME=/workspace/.cache" /etc/environment || exit 1
+            - grep -q "CARGO_HOME=/workspace/.cargo" /etc/environment || exit 1
+            - grep -q "GOPATH=/workspace/go" /etc/environment || exit 1
             - test -f /etc/devbox/warmup.env || exit 1
             - grep -q "DEVBOX_GITHUB_KEY_PARAM=" /etc/devbox/warmup.env || exit 1
             - echo "Workspace mount and warm-up env validated"
