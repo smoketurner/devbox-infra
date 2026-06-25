@@ -13,7 +13,12 @@ set -euo pipefail
 
 MOUNT="${DEVBOX_MOUNT:-/workspace}"
 KEYFILE=""
-cleanup() { [ -n "$KEYFILE" ] && rm -f "$KEYFILE"; }
+# Must return 0: an EXIT trap whose last command is non-zero makes bash exit
+# non-zero even when the script itself succeeded.
+cleanup() {
+  [ -n "$KEYFILE" ] && rm -f "$KEYFILE"
+  return 0
+}
 trap cleanup EXIT
 
 # Resolve the data device without guessing: it is the one whole disk that is
@@ -39,7 +44,9 @@ b64url() { openssl base64 -A | tr '+/' '-_' | tr -d '='; }
 # unauthenticated (private repos then simply won't clone).
 mint_token() {
   local now iat exp header payload signing_input sig jwt api_base token
-  KEYFILE="$(mktemp)"
+  # KEYFILE is created by the caller (in the parent shell) so the EXIT trap can
+  # clean it up — this function runs inside $(...), whose assignments would not
+  # escape the subshell.
   aws ssm get-parameter --name "$DEVBOX_GH_KEY_PARAM" --with-decryption \
     --query 'Parameter.Value' --output text >"$KEYFILE"
   now="$(date +%s)"
@@ -73,6 +80,7 @@ mount "$DATA_DEV" "$MOUNT"
 GH_TOKEN=""
 git_auth=()
 if [ -n "${DEVBOX_GH_KEY_PARAM:-}" ] && [ -n "${DEVBOX_GH_APP_ID:-}" ] && [ -n "${DEVBOX_GH_INSTALLATION_ID:-}" ]; then
+  KEYFILE="$(mktemp)"
   if GH_TOKEN="$(mint_token)"; then
     export GH_TOKEN
     git_auth=(-c "credential.helper=!f() { echo username=x-access-token; echo \"password=\$GH_TOKEN\"; }; f")
