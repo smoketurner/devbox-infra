@@ -7,7 +7,8 @@ locals {
   aws_account_id = data.aws_caller_identity.current.account_id
 
   # Adopted ASG (naming contract shared with the pool module and reconciler).
-  asg_arn = "arn:${local.aws_partition}:autoscaling:${local.aws_region}:${local.aws_account_id}:autoScalingGroup:*:autoScalingGroupName/devbox-pool-${var.pool_id}"
+  asg_name = "devbox-pool-${var.pool_id}"
+  asg_arn  = "arn:${local.aws_partition}:autoscaling:${local.aws_region}:${local.aws_account_id}:autoScalingGroup:*:autoScalingGroupName/${local.asg_name}"
 
   # Dedicated least-privilege DSQL role the app authenticates as via IAM
   # (dsql:DbConnect). Created by the bootstrap SQL (see templates/bootstrap.sql.tftpl);

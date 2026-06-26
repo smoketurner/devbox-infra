@@ -103,9 +103,13 @@ data "aws_iam_policy" "ssm_core" {
 
 # Host runtime: the warm-up agent self-tags its own instance devbox:ready=true.
 # "Own instance only" is not expressible in IAM (no policy variable for the
-# caller's own instance id), so this is scoped by resource type (instance/*) and
-# restricted to the devbox:ready tag key — it provably cannot touch devbox:owner
-# (the SSH authorization tag, applied by the control plane).
+# caller's own instance id), so this is scoped as tightly as a shared instance
+# profile allows: the devbox:ready key only (provably cannot touch devbox:owner,
+# the SSH authorization tag applied by the control plane), the value "true" only,
+# and only on instances in this pool's ASG. A claimant with root on the box can
+# read these instance-profile creds via IMDS, so this policy — not on-box
+# controls — is the durable boundary. Residual: a root claimant could mark a
+# sibling pool box ready slightly early, which warmup would do moments later.
 data "aws_iam_policy_document" "host_runtime" {
   statement {
     sid       = "SelfTagReady"
@@ -113,10 +117,29 @@ data "aws_iam_policy_document" "host_runtime" {
     actions   = ["ec2:CreateTags"]
     resources = ["arn:${local.aws_partition}:ec2:${local.aws_region}:${local.aws_account_id}:instance/*"]
 
+    # Only the devbox:ready key may be written (blocks devbox:owner).
     condition {
       test     = "ForAllValues:StringEquals"
       variable = "aws:TagKeys"
       values   = ["devbox:ready"]
+    }
+
+    # ...and only with the value "true".
+    condition {
+      test     = "StringEquals"
+      variable = "aws:RequestTag/devbox:ready"
+      values   = ["true"]
+    }
+
+    # ...and only on instances in this pool's ASG, whose aws:autoscaling:groupName
+    # tag the ASG applies at launch. Use local.asg_name (a pure string from
+    # var.pool_id), not aws_autoscaling_group.pool.name, to avoid a dependency
+    # cycle: this policy -> ASG -> launch template -> instance profile -> role ->
+    # this policy.
+    condition {
+      test     = "StringEquals"
+      variable = "aws:ResourceTag/aws:autoscaling:groupName"
+      values   = [local.asg_name]
     }
   }
 
