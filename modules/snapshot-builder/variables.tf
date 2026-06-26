@@ -21,7 +21,9 @@ variable "build_subnet_ids" {
 variable "builder_instance_type" {
   description = "Instance type for the snapshot builder (arm64/Graviton, to match the pool toolchain)"
   type        = string
-  default     = "m7g.large"
+  # Compute-optimized Graviton so the warm hook's `make build` (release, incl. aws-lc-rs)
+  # finishes inside devbox-agent's 30-min per-warm-hook timeout. Terminated after each build.
+  default = "c7g.2xlarge"
 }
 
 variable "ami_parameter" {
