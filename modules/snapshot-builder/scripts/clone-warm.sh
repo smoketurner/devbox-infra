@@ -43,6 +43,7 @@ mount "$DATA_DEV" "$MOUNT"
 # the AMI) before cloning so warm hooks populate them; they ride the snapshot and
 # chown to the claimant with the rest of /workspace.
 mkdir -p \
+  "${MOUNT}/.rustup" \
   "${MOUNT}/.cargo" \
   "${MOUNT}/go/bin" \
   "${MOUNT}/.cache/go/mod" \
@@ -52,19 +53,29 @@ mkdir -p \
 
 # Make the baked toolchains usable by warm hooks. The SSM run-command shell is
 # non-login and sources neither /etc/profile.d nor /etc/environment, so put the
-# toolchain on PATH and repoint every build cache at the workspace volume: a hook's
-# downloads and build output must ride the snapshot, not the ephemeral root disk.
+# toolchain on PATH and repoint every tool home / build cache at the workspace
+# volume: a hook's toolchains, downloads, and build output must ride the snapshot,
+# not the ephemeral root disk. RUSTUP_HOME on the volume also lets warm hooks
+# install each repo's pinned toolchain (rust-toolchain.toml) into the snapshot.
 # devbox-agent inherits this environment and passes it through to each warm hook.
 # shellcheck source=/dev/null
 [ -r /etc/profile.d/go.sh ] && . /etc/profile.d/go.sh
 # shellcheck source=/dev/null
 [ -r /etc/profile.d/rust.sh ] && . /etc/profile.d/rust.sh
+export RUSTUP_HOME="${MOUNT}/.rustup"
 export CARGO_HOME="${MOUNT}/.cargo"
 export GOPATH="${MOUNT}/go"
 export GOMODCACHE="${MOUNT}/.cache/go/mod"
 export GOCACHE="${MOUNT}/.cache/go/build"
 export UV_CACHE_DIR="${MOUNT}/.cache/uv"
 export XDG_CACHE_HOME="${MOUNT}/.cache"
+
+# Seed the default stable toolchain onto the volume so repos that do not pin a
+# toolchain build, and editors (rust-analyzer) work, on the claimant's box. Pinned
+# toolchains are installed automatically when a repo's warm hook runs cargo under
+# its rust-toolchain.toml.
+rustup toolchain install stable --profile default --component clippy rustfmt rust-analyzer
+rustup default stable
 
 # Delegate cloning and warm-hook execution to the agent baked into the golden AMI.
 # It mints a per-repo read-only installation token (reading the App key from SSM via

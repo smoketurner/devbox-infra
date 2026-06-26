@@ -67,6 +67,7 @@ phases:
             - grep -q "RequiresMountsFor=/workspace" /etc/systemd/system/devbox-warmup.service || exit 1
             - grep -q "EnvironmentFile=-/etc/devbox/warmup.env" /etc/systemd/system/devbox-warmup.service || exit 1
             - grep -q "XDG_CACHE_HOME=/workspace/.cache" /etc/environment || exit 1
+            - grep -q "RUSTUP_HOME=/workspace/.rustup" /etc/environment || exit 1
             - grep -q "CARGO_HOME=/workspace/.cargo" /etc/environment || exit 1
             - grep -q "GOPATH=/workspace/go" /etc/environment || exit 1
             - test -f /etc/devbox/warmup.env || exit 1
