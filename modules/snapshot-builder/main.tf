@@ -10,8 +10,8 @@ locals {
   clone_warm_run_command = concat(
     [
       "export DEVBOX_REPOS='{{ Repos }}'",
-      "export DEVBOX_GH_KEY_PARAM='{{ GitHubAppKeyParam }}'",
-      "export DEVBOX_GH_APP_ID='{{ GitHubAppId }}'",
+      "export DEVBOX_GITHUB_KEY_PARAM='{{ GitHubAppKeyParam }}'",
+      "export DEVBOX_GITHUB_APP_ID='{{ GitHubAppId }}'",
       "export DEVBOX_MOUNT='{{ MountPoint }}'",
       "bash <<'DEVBOX_CLONE_WARM_EOF'",
     ],
