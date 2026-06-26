@@ -69,7 +69,7 @@ phases:
               What=/dev/disk/by-label/workspace
               Where=/workspace
               Type=ext4
-              Options=defaults,nofail
+              Options=defaults,noatime,nofail
 
               [Install]
               WantedBy=multi-user.target
@@ -195,6 +195,14 @@ phases:
               ClientAliveCountMax 12
               LoginGraceTime 30
 
+              # Drop auth + per-channel latency on the SSM tunnel. GSSAPI is unused
+              # (auth is Vouch certs) and defaults on for EL-family sshd; reverse DNS
+              # can stall a new channel; StreamLocalBindUnlink frees stale forwarded
+              # unix sockets so IDE reconnects don't hit "address already in use".
+              GSSAPIAuthentication no
+              UseDNS no
+              StreamLocalBindUnlink yes
+
               # Vouch SSH certificate authentication
               TrustedUserCAKeys /etc/ssh/vouch_ca.pub
               # Per-claim authorization: the login user must equal the devbox:owner
@@ -242,3 +250,6 @@ phases:
             - grep -q "AuthorizedPrincipalsCommand /usr/local/sbin/devbox-agent" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
             - grep -q "PermitRootLogin no" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
             - grep -q "PasswordAuthentication no" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
+            - grep -q "GSSAPIAuthentication no" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
+            - grep -q "UseDNS no" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
+            - grep -q "noatime" /etc/systemd/system/workspace.mount || exit 1

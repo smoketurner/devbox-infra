@@ -37,7 +37,9 @@ DATA_DEV="$(resolve_data_device)" || {
 echo "Formatting and mounting data device ${DATA_DEV} at ${MOUNT}"
 mkfs.ext4 -F -L workspace "$DATA_DEV"
 mkdir -p "$MOUNT"
-mount "$DATA_DEV" "$MOUNT"
+# noatime to match the pool's workspace.mount and cut atime writes during the
+# checkout/warm build (cargo target, node_modules, git object stores).
+mount -o noatime "$DATA_DEV" "$MOUNT"
 
 # Seed shared on-volume tool-home and cache dirs (must match /etc/environment in
 # the AMI) before cloning so warm hooks populate them; they ride the snapshot and

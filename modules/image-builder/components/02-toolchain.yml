@@ -45,6 +45,13 @@ phases:
               git config --system credential.helper 'cache --timeout=3600'
               git config --system init.defaultBranch main
               git config --system core.autocrlf input
+              # Snappier git for IDEs on large working trees: the fsmonitor daemon
+              # makes `git status` near-instant, untracked-cache + commit-graph speed
+              # status and log/ahead-behind, feature.manyFiles enables the v4 index.
+              git config --system core.fsmonitor true
+              git config --system core.untrackedCache true
+              git config --system fetch.writeCommitGraph true
+              git config --system feature.manyFiles true
       - name: InstallPython314
         action: ExecuteBash
         inputs:
@@ -167,6 +174,8 @@ phases:
             - clang --version || exit 1
             - git --version || exit 1
             - git lfs version || exit 1
+            - test "$(git config --system --get core.fsmonitor)" = "true" || exit 1
+            - test "$(git config --system --get core.untrackedCache)" = "true" || exit 1
             - source /etc/profile.d/go.sh
             - source /etc/profile.d/rust.sh
             - python3.14 --version || exit 1

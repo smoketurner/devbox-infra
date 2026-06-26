@@ -10,6 +10,7 @@ phases:
           commands:
             - echo "=== Verifying installed tools ==="
             - which git || exit 1
+            - test "$(git config --system --get core.fsmonitor)" = "true" || exit 1
             - which docker || exit 1
             - which node || exit 1
             - which python3.14 || exit 1
@@ -42,7 +43,10 @@ phases:
             - grep -q "PermitRootLogin no" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
             - grep -q "PasswordAuthentication no" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
             - grep -q "AuthorizedPrincipalsCommand /usr/local/sbin/devbox-agent" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
+            - grep -q "GSSAPIAuthentication no" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
+            - grep -q "UseDNS no" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
             - sysctl net.ipv4.ip_forward | grep -q "= 1" || exit 1
+            - sysctl net.ipv4.tcp_congestion_control | grep -q "bbr" || exit 1
             - sysctl kernel.randomize_va_space | grep -q "= 2" || exit 1
             - visudo -c || exit 1
             - echo "Security configuration validated"
@@ -64,6 +68,7 @@ phases:
             # is enabled (not active) and the config files exist; never assert the
             # mount is active.
             - systemctl is-enabled workspace.mount || exit 1
+            - grep -q "noatime" /etc/systemd/system/workspace.mount || exit 1
             - grep -q "RequiresMountsFor=/workspace" /etc/systemd/system/devbox-warmup.service || exit 1
             - grep -q "EnvironmentFile=-/etc/devbox/warmup.env" /etc/systemd/system/devbox-warmup.service || exit 1
             - grep -q "XDG_CACHE_HOME=/workspace/.cache" /etc/environment || exit 1
