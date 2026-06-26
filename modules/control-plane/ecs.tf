@@ -72,6 +72,8 @@ resource "aws_ecs_task_definition" "server" {
     logConfiguration = {
       logDriver = "awslogs"
       options = {
+        "mode"                  = "non-blocking"
+        "max-buffer-size"       = "16m"
         "awslogs-group"         = aws_cloudwatch_log_group.server.name
         "awslogs-region"        = local.aws_region
         "awslogs-stream-prefix" = "devbox-server"
