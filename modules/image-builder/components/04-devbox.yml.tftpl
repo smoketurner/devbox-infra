@@ -74,14 +74,16 @@ phases:
               [Install]
               WantedBy=multi-user.target
               EOF
-            # System-wide cache dirs on the data volume, read by PAM for the
-            # claimant's login shells and fresh useradd -m home (which ~/.cargo
-            # would miss). Paths match the snapshot-builder's on-volume layout.
-            # /etc/profile.d/rust.sh deliberately sets only PATH/RUSTUP_HOME and
-            # leaves CARGO_HOME to this file, so the warmed on-volume cache wins.
+            # System-wide tool homes / cache dirs on the data volume, read by PAM
+            # for the claimant's login shells and fresh useradd -m home (which
+            # ~/.cargo and ~/.rustup would miss). Paths match the snapshot-builder's
+            # on-volume layout. /etc/profile.d/rust.sh sets only PATH plus a baked
+            # RUSTUP_HOME fallback, and leaves the on-volume RUSTUP_HOME/CARGO_HOME
+            # to this file, so the warmed on-volume toolchain and cache win.
             - |
               cat >> /etc/environment <<'EOF'
               XDG_CACHE_HOME=/workspace/.cache
+              RUSTUP_HOME=/workspace/.rustup
               CARGO_HOME=/workspace/.cargo
               GOPATH=/workspace/go
               GOMODCACHE=/workspace/.cache/go/mod
