@@ -125,12 +125,15 @@ data "aws_iam_policy_document" "snapshot_automation" {
     }
   }
 
+  # The clone-warm doc name embeds sha256(script) and is replaced on every script
+  # change; the automation always calls the current one by name. Grant the name prefix,
+  # not the exact hashed ARN, so a scheduled run never races a script-change apply.
   statement {
     sid     = "RunCloneWarm"
     effect  = "Allow"
     actions = ["ssm:SendCommand"]
     resources = [
-      aws_ssm_document.clone_warm.arn,
+      "arn:${local.aws_partition}:ssm:${local.aws_region}:${local.aws_account_id}:document/${local.name_prefix}-clone-warm-*",
       "arn:${local.aws_partition}:ec2:${local.aws_region}:${local.aws_account_id}:instance/*",
     ]
   }
