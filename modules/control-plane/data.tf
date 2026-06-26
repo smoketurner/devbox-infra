@@ -47,6 +47,8 @@ data "aws_iam_policy_document" "task" {
     resources = ["*"]
   }
 
+  # The reconciler (apply_pending_owner_tags) is the only CreateTags caller and
+  # writes exactly devbox:owner (always) and devbox:owner-email (when present).
   statement {
     sid       = "EC2CreateTags"
     effect    = "Allow"
@@ -54,9 +56,17 @@ data "aws_iam_policy_document" "task" {
     resources = ["*"]
 
     condition {
-      test     = "ForAllValues:StringLike"
+      test     = "ForAllValues:StringEquals"
       variable = "aws:TagKeys"
-      values   = ["devbox:*"]
+      values   = ["devbox:owner", "devbox:owner-email"]
+    }
+
+    # Scope to instances in this pool's ASG. The server tags the just-claimed
+    # instance, which is InService and so already carries the groupName tag.
+    condition {
+      test     = "StringEquals"
+      variable = "aws:ResourceTag/aws:autoscaling:groupName"
+      values   = [local.asg_name]
     }
   }
 
