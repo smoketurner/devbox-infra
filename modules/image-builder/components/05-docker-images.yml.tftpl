@@ -31,3 +31,16 @@ phases:
               for img in ${docker_images}; do
                 docker image inspect "$img" >/dev/null 2>&1 || { echo "missing image: $img" >&2; exit 1; }
               done
+  - name: test
+    steps:
+      - name: TestImages
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "=== Testing pre-pulled images on the booted AMI ==="
+            - systemctl is-active docker || exit 1
+            - |
+              for img in ${docker_images}; do
+                docker image inspect "$img" >/dev/null 2>&1 || { echo "missing image: $img" >&2; exit 1; }
+              done
+            - echo "Pre-pulled images present on boot"

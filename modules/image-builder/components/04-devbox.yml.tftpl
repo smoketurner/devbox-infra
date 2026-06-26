@@ -1,28 +1,9 @@
 name: Devbox
-description: Install host agent dependencies, the devbox-agent binary and services, and Vouch-CA SSH config
+description: Install the devbox-agent binary, the workspace mount, and the warm-up / owner-sync services
 schemaVersion: 1.0
 phases:
   - name: build
     steps:
-      - name: EnsureSSMAgent
-        action: ExecuteBash
-        inputs:
-          commands:
-            - echo "Ensuring SSM Agent is enabled (already installed on base AMI)"
-            - systemctl enable amazon-ssm-agent
-      - name: InstallCloudWatchAgent
-        action: ExecuteBash
-        inputs:
-          commands:
-            - echo "Installing CloudWatch Agent"
-            - dnf install -y amazon-cloudwatch-agent
-            - systemctl enable amazon-cloudwatch-agent
-      - name: VerifyAWSCLI
-        action: ExecuteBash
-        inputs:
-          commands:
-            - echo "Verifying AWS CLI v2 (already installed on base AMI)"
-            - aws --version
       - name: CreateWorkspaceDirectory
         action: ExecuteBash
         inputs:
@@ -171,85 +152,55 @@ phases:
               EOF
             - systemctl daemon-reload
             - systemctl enable devbox-owner-sync.service
-      - name: ConfigureSSHD
-        action: ExecuteBash
-        inputs:
-          commands:
-            - echo "Configuring SSH daemon"
-            - cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
-            - |
-              cat > /etc/ssh/sshd_config.d/99-devbox.conf <<'EOF'
-              # Devbox SSH hardening
-              PermitRootLogin no
-              PasswordAuthentication no
-              PubkeyAuthentication yes
-              KbdInteractiveAuthentication no
-              UsePAM yes
-              X11Forwarding no
-              PrintMotd no
-              AcceptEnv LANG LC_*
-              MaxAuthTries 3
-              MaxSessions 10
-              # Keep agent sessions alive (~3600s idle): 300s * 12
-              ClientAliveInterval 300
-              ClientAliveCountMax 12
-              LoginGraceTime 30
-
-              # Drop auth + per-channel latency on the SSM tunnel. GSSAPI is unused
-              # (auth is Vouch certs) and defaults on for EL-family sshd; reverse DNS
-              # can stall a new channel; StreamLocalBindUnlink frees stale forwarded
-              # unix sockets so IDE reconnects don't hit "address already in use".
-              GSSAPIAuthentication no
-              UseDNS no
-              StreamLocalBindUnlink yes
-
-              # Vouch SSH certificate authentication
-              TrustedUserCAKeys /etc/ssh/vouch_ca.pub
-              # Per-claim authorization: the login user must equal the devbox:owner
-              # tag (the claimant's Vouch principal). Resolved on every auth by the
-              # on-host devbox-agent reading IMDS; fail-closed when unclaimed. The
-              # matching Unix account is provisioned by devbox-owner-sync.service.
-              AuthorizedPrincipalsCommand /usr/local/sbin/devbox-agent principals %u
-              AuthorizedPrincipalsCommandUser nobody
-              EOF
-            - chmod 600 /etc/ssh/sshd_config.d/99-devbox.conf
-      - name: ConfigureVouchCA
-        action: ExecuteBash
-        inputs:
-          commands:
-            - echo "Fetching Vouch SSH CA public key"
-            - curl -fsS https://us.vouch.sh/v1/credentials/ssh/ca | jq -r '.public_key' > /etc/ssh/vouch_ca.pub
-            - chmod 644 /etc/ssh/vouch_ca.pub
-            - test -s /etc/ssh/vouch_ca.pub
-      - name: GenerateHostKeys
-        action: ExecuteBash
-        inputs:
-          commands:
-            - echo "Regenerating SSH host keys"
-            - rm -f /etc/ssh/ssh_host_*
-            - ssh-keygen -t ed25519 -f /etc/ssh/ssh_host_ed25519_key -N ""
-            - ssh-keygen -t rsa -b 4096 -f /etc/ssh/ssh_host_rsa_key -N ""
   - name: validate
     steps:
       - name: ValidateDevbox
         action: ExecuteBash
         inputs:
           commands:
-            - echo "Validating devbox host configuration"
-            - systemctl is-enabled amazon-ssm-agent || exit 1
-            - systemctl is-enabled amazon-cloudwatch-agent || exit 1
-            - aws --version || exit 1
+            - echo "Validating devbox agent, workspace, and services"
             - test -d /workspace || exit 1
             - test -x /usr/local/sbin/devbox-agent || exit 1
             - /usr/local/sbin/devbox-agent --version || exit 1
             - systemctl is-enabled devbox-warmup.service || exit 1
             - systemctl is-enabled devbox-owner-sync.service || exit 1
-            - sshd -t || exit 1
-            - test -s /etc/ssh/vouch_ca.pub || exit 1
-            - grep -q "TrustedUserCAKeys" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
-            - grep -q "AuthorizedPrincipalsCommand /usr/local/sbin/devbox-agent" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
-            - grep -q "PermitRootLogin no" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
-            - grep -q "PasswordAuthentication no" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
-            - grep -q "GSSAPIAuthentication no" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
-            - grep -q "UseDNS no" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
             - grep -q "noatime" /etc/systemd/system/workspace.mount || exit 1
+  - name: test
+    steps:
+      - name: TestDevboxServices
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "=== Testing devbox services on the booted AMI ==="
+            - systemctl is-enabled devbox-warmup.service || exit 1
+            - systemctl is-enabled devbox-owner-sync.service || exit 1
+            - echo "Devbox services verified on boot"
+      - name: TestDevboxAgentAndConfig
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "=== Testing devbox agent, workspace, and environment ==="
+            - test -x /usr/local/sbin/devbox-agent || exit 1
+            - /usr/local/sbin/devbox-agent --version || exit 1
+            - test -d /workspace || exit 1
+            - grep -q "XDG_CACHE_HOME=/workspace/.cache" /etc/environment || exit 1
+            - grep -q "RUSTUP_HOME=/workspace/.rustup" /etc/environment || exit 1
+            - grep -q "CARGO_HOME=/workspace/.cargo" /etc/environment || exit 1
+            - grep -q "GOPATH=/workspace/go" /etc/environment || exit 1
+            - grep -q "DEVBOX_GITHUB_APP_ID=" /etc/environment || exit 1
+            - grep -q "DEVBOX_GITHUB_KEY_PARAM=" /etc/environment || exit 1
+            - test -f /etc/devbox/warmup.env || exit 1
+            - grep -q "DEVBOX_GITHUB_KEY_PARAM=" /etc/devbox/warmup.env || exit 1
+            - echo "Agent, workspace, and environment verified on boot"
+      # Attach the real workspace snapshot, mount it, and assert devbox-warmup
+      # reaches active on the booted AMI. The orchestration lives in
+      # scripts/test-workspace-mount.sh (shellcheck/shfmt-linted) and is injected
+      # here at build time; this step only passes in the two Terraform values.
+      - name: TestWorkspaceMountAndWarmup
+        action: ExecuteBash
+        inputs:
+          commands:
+            - |
+              export DEVBOX_TEST_MOUNT_ENABLED="${enable_workspace_mount}"
+              export DEVBOX_WORKSPACE_SNAPSHOT_PARAM="${workspace_snapshot_param}"
+              ${indent(14, trimspace(test_workspace_mount_script))}

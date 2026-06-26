@@ -198,3 +198,43 @@ phases:
             # version check alone passed even when dockerd refused to boot.
             - systemctl start docker || exit 1
             - timeout 30 docker info || exit 1
+  - name: test
+    steps:
+      - name: TestToolchain
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "=== Testing toolchain on the booted AMI ==="
+            - which git || exit 1
+            - which node || exit 1
+            - which python3.14 || exit 1
+            - which cmake || exit 1
+            - which docker || exit 1
+            - source /etc/profile.d/go.sh && which go || exit 1
+            - source /etc/profile.d/rust.sh && which rustc || exit 1
+            - git --version || exit 1
+            - node --version || exit 1
+            - python3.14 --version || exit 1
+            - source /etc/profile.d/go.sh && go version || exit 1
+            - source /etc/profile.d/rust.sh && rustc --version || exit 1
+            - echo "Toolchain present on boot"
+      - name: TestDockerRuntime
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "=== Testing Docker runs on boot ==="
+            - systemctl is-active docker || exit 1
+            - timeout 30 docker info || exit 1
+            - echo "Docker active on boot"
+      - name: PrintVersionSummary
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "=== Version Summary ==="
+            - "echo \"Git: $(git --version)\""
+            - "echo \"Docker: $(docker --version)\""
+            - "echo \"Node: $(node --version)\""
+            - "echo \"Python: $(python3.14 --version)\""
+            - "source /etc/profile.d/go.sh && echo \"Go: $(go version)\""
+            - "source /etc/profile.d/rust.sh && echo \"Rust: $(rustc --version)\""
+            - "echo \"AWS CLI: $(aws --version)\""

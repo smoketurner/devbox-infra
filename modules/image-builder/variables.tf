@@ -163,6 +163,33 @@ variable "docker_images" {
   default     = []
 }
 
+# Test-stage workspace-mount exercise. The 04-devbox test phase (test stage, on a
+# fresh instance launched from the new AMI) resolves the workspace snapshot,
+# attaches it as a real volume, mounts it, and asserts devbox-warmup reaches active.
+
+variable "workspace_snapshot_param" {
+  description = "Name of the SSM parameter holding the latest workspace snapshot id, resolved in the test stage to attach the real /workspace volume. Passed by name (not a snapshot-builder module reference) to avoid a dependency cycle."
+  type        = string
+  default     = "/devbox/workspace-snapshot/latest"
+
+  validation {
+    condition     = startswith(var.workspace_snapshot_param, "/")
+    error_message = "Workspace snapshot parameter name must start with /."
+  }
+}
+
+variable "github_app_key_param_arn" {
+  description = "ARN of the SSM SecureString parameter holding the GitHub App private key. Granted to the build instance role so the test stage can run warm-up (mint a token) against the real AMI. Empty omits the grant."
+  type        = string
+  default     = ""
+}
+
+variable "enable_test_stage_workspace_mount" {
+  description = "Exercise the real /workspace mount + warm-up in the test stage: attach the workspace snapshot, mount it, and assert devbox-warmup reaches active. Adds EC2 volume / KMS / SSM grants to the build instance role and a data lookup on the workspace KMS alias. Keep false until snapshot-builder is applied (the alias must exist)."
+  type        = bool
+  default     = false
+}
+
 variable "warmup_fetch_timeout_secs" {
   description = "Optional override for the agent's overall fetch budget (WARMUP_FETCH_TIMEOUT_SECS). Empty uses the agent default (120s)."
   type        = string

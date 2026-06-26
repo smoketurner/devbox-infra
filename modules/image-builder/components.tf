@@ -18,6 +18,11 @@ locals {
       github_app_key_param      = var.github_app_key_param
       warmup_fetch_timeout_secs = var.warmup_fetch_timeout_secs
       docker_images             = join(" ", var.docker_images)
+      workspace_snapshot_param  = var.workspace_snapshot_param
+      enable_workspace_mount    = tostring(var.enable_test_stage_workspace_mount)
+      # Complex orchestration kept in a linted .sh file, injected verbatim (its
+      # bash $${...} is not re-interpreted, so no templatefile escaping needed).
+      test_workspace_mount_script = file("${path.module}/components/scripts/test-workspace-mount.sh")
     }) : file("${path.module}/components/${f}")
   }
 }

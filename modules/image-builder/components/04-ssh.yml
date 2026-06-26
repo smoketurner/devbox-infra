@@ -1,0 +1,94 @@
+name: SSH
+description: Configure SSH daemon hardening, Vouch SSH CA trust, and fresh host keys
+schemaVersion: 1.0
+phases:
+  - name: build
+    steps:
+      - name: ConfigureSSHD
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Configuring SSH daemon"
+            - cp /etc/ssh/sshd_config /etc/ssh/sshd_config.bak
+            - |
+              cat > /etc/ssh/sshd_config.d/99-devbox.conf <<'EOF'
+              # Devbox SSH hardening
+              PermitRootLogin no
+              PasswordAuthentication no
+              PubkeyAuthentication yes
+              KbdInteractiveAuthentication no
+              UsePAM yes
+              X11Forwarding no
+              PrintMotd no
+              AcceptEnv LANG LC_*
+              MaxAuthTries 3
+              MaxSessions 10
+              # Keep agent sessions alive (~3600s idle): 300s * 12
+              ClientAliveInterval 300
+              ClientAliveCountMax 12
+              LoginGraceTime 30
+
+              # Drop auth + per-channel latency on the SSM tunnel. GSSAPI is unused
+              # (auth is Vouch certs) and defaults on for EL-family sshd; reverse DNS
+              # can stall a new channel; StreamLocalBindUnlink frees stale forwarded
+              # unix sockets so IDE reconnects don't hit "address already in use".
+              GSSAPIAuthentication no
+              UseDNS no
+              StreamLocalBindUnlink yes
+
+              # Vouch SSH certificate authentication
+              TrustedUserCAKeys /etc/ssh/vouch_ca.pub
+              # Per-claim authorization: the login user must equal the devbox:owner
+              # tag (the claimant's Vouch principal). Resolved on every auth by the
+              # on-host devbox-agent reading IMDS; fail-closed when unclaimed. The
+              # matching Unix account is provisioned by devbox-owner-sync.service.
+              AuthorizedPrincipalsCommand /usr/local/sbin/devbox-agent principals %u
+              AuthorizedPrincipalsCommandUser nobody
+              EOF
+            - chmod 600 /etc/ssh/sshd_config.d/99-devbox.conf
+      - name: ConfigureVouchCA
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Fetching Vouch SSH CA public key"
+            - curl -fsS https://us.vouch.sh/v1/credentials/ssh/ca | jq -r '.public_key' > /etc/ssh/vouch_ca.pub
+            - chmod 644 /etc/ssh/vouch_ca.pub
+            - test -s /etc/ssh/vouch_ca.pub
+      - name: GenerateHostKeys
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Regenerating SSH host keys"
+            - rm -f /etc/ssh/ssh_host_*
+            - ssh-keygen -t ed25519 -f /etc/ssh/ssh_host_ed25519_key -N ""
+            - ssh-keygen -t rsa -b 4096 -f /etc/ssh/ssh_host_rsa_key -N ""
+  - name: validate
+    steps:
+      - name: ValidateSSH
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Validating SSH configuration"
+            - sshd -t || exit 1
+            - test -s /etc/ssh/vouch_ca.pub || exit 1
+            - grep -q "TrustedUserCAKeys" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
+            - grep -q "AuthorizedPrincipalsCommand /usr/local/sbin/devbox-agent" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
+            - grep -q "PermitRootLogin no" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
+            - grep -q "PasswordAuthentication no" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
+            - grep -q "GSSAPIAuthentication no" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
+            - grep -q "UseDNS no" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
+  - name: test
+    steps:
+      - name: TestSSH
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "=== Testing SSH on the booted AMI ==="
+            - systemctl is-active sshd || exit 1
+            - sshd -t || exit 1
+            - test -s /etc/ssh/vouch_ca.pub || exit 1
+            - grep -q "PermitRootLogin no" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
+            - grep -q "PasswordAuthentication no" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
+            - grep -q "AuthorizedPrincipalsCommand /usr/local/sbin/devbox-agent" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
+            - grep -q "TrustedUserCAKeys" /etc/ssh/sshd_config.d/99-devbox.conf || exit 1
+            - echo "SSH verified on boot"

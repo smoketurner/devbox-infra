@@ -125,6 +125,127 @@ data "aws_ssm_parameter" "al2023_ami" {
   name = "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.18-arm64"
 }
 
+# Workspace snapshot CMK, resolved by alias to avoid a module cycle with
+# snapshot-builder (which already depends on this module). The key's policy
+# delegates to the account root, so the IAM grant below is sufficient — no
+# snapshot-builder change. Gated on the test-mount toggle so a bootstrap apply
+# (before snapshot-builder exists) does not fail resolving a missing alias.
+data "aws_kms_key" "workspace" {
+  count  = var.enable_test_stage_workspace_mount ? 1 : 0
+  key_id = "alias/${var.name_prefix}-snapshot-builder-workspace"
+}
+
+# Test-stage workspace-mount permissions for the build instance role (used by both
+# build and test instances). Lets the test instance create + attach the workspace
+# snapshot volume, mount it, and run warm-up against the real AMI. Scoped by
+# region/tag/key; the destructive ops (detach/delete) are limited to volumes this
+# test created (devbox:role=workspace-test).
+data "aws_iam_policy_document" "build_instance_test_mount" {
+  count = var.enable_test_stage_workspace_mount ? 1 : 0
+
+  statement {
+    sid     = "ReadSnapshotAndKeyParams"
+    effect  = "Allow"
+    actions = ["ssm:GetParameter"]
+    resources = compact([
+      "arn:${local.aws_partition}:ssm:${local.aws_region}:${local.aws_account_id}:parameter${var.workspace_snapshot_param}",
+      var.github_app_key_param_arn,
+    ])
+  }
+
+  # Full EBS-encryption action set, matching the snapshot-builder roles and the
+  # AutoScaling SLR that are already allowed on this key. Encrypt + ReEncrypt* are
+  # required for the async restore when creating an encrypted volume from the
+  # encrypted snapshot; without them the volume errors out and EC2 deletes it.
+  statement {
+    sid    = "UseWorkspaceKey"
+    effect = "Allow"
+    actions = [
+      "kms:Encrypt",
+      "kms:Decrypt",
+      "kms:ReEncrypt*",
+      "kms:GenerateDataKey*",
+      "kms:DescribeKey",
+      "kms:CreateGrant",
+    ]
+    resources = [data.aws_kms_key.workspace[0].arn]
+  }
+
+  # Create the volume, attach it to this ephemeral test instance, and flip its
+  # delete-on-termination. Region-scoped: these target the throwaway test instance,
+  # which carries no stable tag to scope on.
+  statement {
+    sid    = "CreateAndAttachWorkspaceTestVolume"
+    effect = "Allow"
+    actions = [
+      "ec2:CreateVolume",
+      "ec2:DescribeVolumes",
+      "ec2:AttachVolume",
+      "ec2:ModifyInstanceAttribute",
+    ]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:RequestedRegion"
+      values   = [local.aws_region]
+    }
+  }
+
+  # Tag only the volume created by CreateVolume, never existing resources.
+  statement {
+    sid       = "TagWorkspaceTestVolumeOnCreate"
+    effect    = "Allow"
+    actions   = ["ec2:CreateTags"]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "ec2:CreateAction"
+      values   = ["CreateVolume"]
+    }
+  }
+
+  # Detach/delete only volumes this test created.
+  statement {
+    sid    = "ReleaseWorkspaceTestVolume"
+    effect = "Allow"
+    actions = [
+      "ec2:DetachVolume",
+      "ec2:DeleteVolume",
+    ]
+    resources = ["*"]
+
+    condition {
+      test     = "StringEquals"
+      variable = "ec2:ResourceTag/devbox:role"
+      values   = ["workspace-test"]
+    }
+  }
+
+  # Warm-up self-tags the instance devbox:ready=true. Harmless here (the test
+  # instance is not in the pool ASG, and claim discovery is ASG-only), so this
+  # mirrors the pool's SelfTagReady minus the ASG-membership condition.
+  statement {
+    sid       = "SelfTagReady"
+    effect    = "Allow"
+    actions   = ["ec2:CreateTags"]
+    resources = ["arn:${local.aws_partition}:ec2:${local.aws_region}:${local.aws_account_id}:instance/*"]
+
+    condition {
+      test     = "ForAllValues:StringEquals"
+      variable = "aws:TagKeys"
+      values   = ["devbox:ready"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:RequestTag/devbox:ready"
+      values   = ["true"]
+    }
+  }
+}
+
 # KMS key policy for AMI encryption
 data "aws_iam_policy_document" "kms_key" {
   # Allow the owning account full management

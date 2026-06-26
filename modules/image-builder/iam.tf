@@ -44,6 +44,17 @@ resource "aws_iam_role_policy" "secrets_access" {
   policy = data.aws_iam_policy_document.secrets_access[0].json
 }
 
+# Custom inline policy: test-stage workspace mount + warm-up (gated). Off by
+# default so a bootstrap apply needs none of these grants.
+resource "aws_iam_role_policy" "test_mount" {
+  count = var.enable_test_stage_workspace_mount ? 1 : 0
+
+  name = "${local.name_prefix}-test-mount"
+  role = aws_iam_role.build_instance.id
+
+  policy = data.aws_iam_policy_document.build_instance_test_mount[0].json
+}
+
 # Instance profile wrapping the build instance role
 resource "aws_iam_instance_profile" "build_instance" {
   name = "${local.name_prefix}-instance-profile"

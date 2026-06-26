@@ -56,3 +56,15 @@ phases:
             - test -x /usr/local/bin/devbox-git-credential-helper || exit 1
             - test -f /etc/skel/.ssh/config || exit 1
             - gh --version || exit 1
+  - name: test
+    steps:
+      - name: TestRepos
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "=== Testing repo tooling on the booted AMI ==="
+            - gh --version || exit 1
+            - which git || exit 1
+            - test -x /usr/local/bin/devbox-git-credential-helper || exit 1
+            - test -f /etc/skel/.ssh/config || exit 1
+            - echo "Repo tooling verified on boot"

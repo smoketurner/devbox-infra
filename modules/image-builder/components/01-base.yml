@@ -144,3 +144,31 @@ phases:
             - test -f /etc/sysctl.d/99-devbox-perf.conf || exit 1
             - test -f /etc/audit/rules.d/devbox.rules || exit 1
             - visudo -c || exit 1
+  - name: test
+    steps:
+      - name: TestBaseHardening
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "=== Testing base hardening on the booted AMI ==="
+            - systemctl is-active multi-user.target || exit 1
+            - systemctl is-active auditd || exit 1
+            - which jq || exit 1
+            - which tmux || exit 1
+            - timedatectl | grep -q "UTC" || exit 1
+            - sysctl net.ipv4.ip_forward | grep -q "= 1" || exit 1
+            - sysctl kernel.randomize_va_space | grep -q "= 2" || exit 1
+            - sysctl fs.protected_hardlinks | grep -q "= 1" || exit 1
+            - sysctl net.ipv4.tcp_congestion_control | grep -q "bbr" || exit 1
+            - test -f /etc/audit/rules.d/devbox.rules || exit 1
+            - visudo -c || exit 1
+            - echo "Base hardening verified on boot"
+      - name: TestDiskSpace
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "=== Verifying disk space on the AMI root volume ==="
+            - "AVAIL_GB=$(df -BG / | tail -1 | awk '{print $4}' | tr -d 'G')"
+            - "echo \"Available root disk space: ${AVAIL_GB}G\""
+            - "test \"$AVAIL_GB\" -ge 10 || (echo \"ERROR: Less than 10G available\" && exit 1)"
+            - echo "Disk space check passed"

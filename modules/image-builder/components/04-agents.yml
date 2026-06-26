@@ -1,0 +1,40 @@
+name: Agents
+description: Enable host observability agents (SSM, CloudWatch) and verify the AWS CLI
+schemaVersion: 1.0
+phases:
+  - name: build
+    steps:
+      - name: EnsureSSMAgent
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Ensuring SSM Agent is enabled (already installed on base AMI)"
+            - systemctl enable amazon-ssm-agent
+      - name: InstallCloudWatchAgent
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Installing CloudWatch Agent"
+            - dnf install -y amazon-cloudwatch-agent
+            - systemctl enable amazon-cloudwatch-agent
+  - name: validate
+    steps:
+      - name: ValidateAgents
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "Validating host agents"
+            - systemctl is-enabled amazon-ssm-agent || exit 1
+            - systemctl is-enabled amazon-cloudwatch-agent || exit 1
+            - aws --version || exit 1
+  - name: test
+    steps:
+      - name: TestAgents
+        action: ExecuteBash
+        inputs:
+          commands:
+            - echo "=== Testing host agents on the booted AMI ==="
+            - systemctl is-active amazon-ssm-agent || exit 1
+            - systemctl is-enabled amazon-cloudwatch-agent || exit 1
+            - aws --version || exit 1
+            - echo "Host agents verified on boot"

@@ -20,14 +20,23 @@ module "image_builder" {
     "01-base.yml",
     "02-toolchain.yml",
     "03-repos.yml",
+    "04-agents.yml",
     "04-devbox.yml.tftpl",
+    "04-ssh.yml",
     "05-docker-images.yml.tftpl",
-    "99-validation.yml",
   ]
 
   # Bake the warming agent's GitHub App config into the AMI's warmup EnvironmentFile.
   github_app_id        = var.github_app_id
   github_app_key_param = aws_ssm_parameter.github_app_private_key.name
+
+  # Exercise the real /workspace mount + warm-up in the test stage against the
+  # booted AMI. The snapshot param is passed by literal name (not
+  # module.snapshot_builder.ssm_parameter_name) because snapshot_builder already
+  # depends on this module — a module reference here would be a dependency cycle.
+  github_app_key_param_arn          = aws_ssm_parameter.github_app_private_key.arn
+  workspace_snapshot_param          = "/devbox/workspace-snapshot/latest"
+  enable_test_stage_workspace_mount = true
 
   # Base images pre-pulled into the AMI's /var/lib/docker so first container use is
   # warm. Sizing: the recipe root volume (and pool ebs_volume_size) must hold these.
