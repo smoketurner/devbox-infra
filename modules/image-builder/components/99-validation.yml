@@ -71,6 +71,9 @@ phases:
             - grep -q "GOPATH=/workspace/go" /etc/environment || exit 1
             - test -f /etc/devbox/warmup.env || exit 1
             - grep -q "DEVBOX_GITHUB_KEY_PARAM=" /etc/devbox/warmup.env || exit 1
+            # Also exported globally so on-claim `devbox-agent checkout` authenticates.
+            - grep -q "DEVBOX_GITHUB_APP_ID=" /etc/environment || exit 1
+            - grep -q "DEVBOX_GITHUB_KEY_PARAM=" /etc/environment || exit 1
             - echo "Workspace mount and warm-up env validated"
       - name: VerifyDiskSpace
         action: ExecuteBash

@@ -88,6 +88,15 @@ phases:
               GOCACHE=/workspace/.cache/go/build
               UV_CACHE_DIR=/workspace/.cache/uv
               EOF
+            # GitHub App config, global so `devbox-agent checkout` — run by a developer
+            # or agent on a claimed box, outside the warmup unit — mints tokens the same
+            # as warmup. PAM applies /etc/environment to login and ssh-command sessions.
+            # Non-secret (App id + SSM parameter name); the App private key stays in SSM.
+            - |
+              cat >> /etc/environment <<'EOF'
+              DEVBOX_GITHUB_APP_ID=${github_app_id}
+              DEVBOX_GITHUB_KEY_PARAM=${github_app_key_param}
+              EOF
             - |
               cat > /etc/npmrc <<'EOF'
               store-dir=/workspace/.cache/pnpm

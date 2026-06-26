@@ -138,10 +138,12 @@ variable "devbox_agent_sha256" {
   default     = ""
 }
 
-# Workspace-freshen config baked into the warmup service's EnvironmentFile
-# (/etc/devbox/warmup.env). The warmup systemd unit does not read /etc/environment,
-# so the agent's DEVBOX_GITHUB_* config must reach it here. All non-secret; the App
-# private key itself is read from SSM at warmup via the host instance profile.
+# GitHub App config for the warming agent. Baked into the warmup service's
+# EnvironmentFile (/etc/devbox/warmup.env) because the systemd unit does not read
+# /etc/environment, and also appended to /etc/environment so on-claim
+# `devbox-agent checkout` (which runs outside that unit) mints tokens too. All
+# non-secret; the App private key itself is read from SSM at run time via the host
+# instance profile.
 
 variable "github_app_id" {
   description = "GitHub App ID / Client ID the warming agent uses as the JWT issuer. Empty disables authenticated fetch (public repos only)."
