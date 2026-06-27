@@ -144,13 +144,19 @@ data "aws_iam_policy_document" "build_instance_test_mount" {
   count = var.enable_test_stage_workspace_mount ? 1 : 0
 
   statement {
-    sid     = "ReadSnapshotAndKeyParams"
-    effect  = "Allow"
-    actions = ["ssm:GetParameter"]
-    resources = compact([
-      "arn:${local.aws_partition}:ssm:${local.aws_region}:${local.aws_account_id}:parameter${var.workspace_snapshot_param}",
-      var.github_app_key_param_arn,
-    ])
+    sid       = "ReadSnapshotParam"
+    effect    = "Allow"
+    actions   = ["ssm:GetParameter"]
+    resources = ["arn:${local.aws_partition}:ssm:${local.aws_region}:${local.aws_account_id}:parameter${var.workspace_snapshot_param}"]
+  }
+
+  # Test-stage warm-up requests a repo-scoped GitHub token from the control plane
+  # using this instance's AWS identity (the App private key is no longer on the box).
+  statement {
+    sid       = "GetWebIdentityToken"
+    effect    = "Allow"
+    actions   = ["sts:GetWebIdentityToken"]
+    resources = ["*"]
   }
 
   # Full EBS-encryption action set, matching the snapshot-builder roles and the

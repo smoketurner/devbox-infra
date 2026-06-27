@@ -143,18 +143,16 @@ data "aws_iam_policy_document" "host_runtime" {
     }
   }
 
-  # The warming agent reads the GitHub App private key on-box to mint a 1h
-  # read-only installation token for the /workspace fetch (devbox-agent
-  # github_token.rs). SecureString on the default alias/aws/ssm key needs no
-  # explicit kms:Decrypt; add one only if the parameter moves to a CMK.
-  dynamic "statement" {
-    for_each = var.github_app_private_key_param_arn != "" ? [1] : []
-    content {
-      sid       = "ReadGitHubAppKey"
-      effect    = "Allow"
-      actions   = ["ssm:GetParameter"]
-      resources = [var.github_app_private_key_param_arn]
-    }
+  # The warming agent presents this instance's AWS identity to the control plane
+  # to obtain a short-lived, repo-scoped GitHub token (the App private key no
+  # longer lives on the box). The only credential it needs is its own AWS
+  # web-identity token: GetWebIdentityToken on `:self` requires no other
+  # permission and is implicitly scoped to this instance's own identity.
+  statement {
+    sid       = "GetWebIdentityToken"
+    effect    = "Allow"
+    actions   = ["sts:GetWebIdentityToken"]
+    resources = ["*"]
   }
 }
 

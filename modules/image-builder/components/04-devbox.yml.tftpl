@@ -71,14 +71,13 @@ phases:
               GOCACHE=/workspace/.cache/go/build
               UV_CACHE_DIR=/workspace/.cache/uv
               EOF
-            # GitHub App config, global so `devbox-agent checkout` — run by a developer
-            # or agent on a claimed box, outside the warmup unit — mints tokens the same
-            # as warmup. PAM applies /etc/environment to login and ssh-command sessions.
-            # Non-secret (App id + SSM parameter name); the App private key stays in SSM.
+            # Control-plane URL, global so `devbox-agent checkout` — run by a developer
+            # or agent on a claimed box, outside the warmup unit — requests tokens the
+            # same as warmup. PAM applies /etc/environment to login and ssh-command
+            # sessions. Non-secret; the agent authenticates with its AWS identity.
             - |
               cat >> /etc/environment <<'EOF'
-              DEVBOX_GITHUB_APP_ID=${github_app_id}
-              DEVBOX_GITHUB_KEY_PARAM=${github_app_key_param}
+              DEVBOX_SERVER_URL=${control_plane_url}
               EOF
             - |
               cat > /etc/npmrc <<'EOF'
@@ -90,8 +89,7 @@ phases:
             - mkdir -p /etc/devbox
             - |
               cat > /etc/devbox/warmup.env <<'EOF'
-              DEVBOX_GITHUB_APP_ID=${github_app_id}
-              DEVBOX_GITHUB_KEY_PARAM=${github_app_key_param}
+              DEVBOX_SERVER_URL=${control_plane_url}
               WARMUP_FETCH_TIMEOUT_SECS=${warmup_fetch_timeout_secs}
               EOF
             - chmod 0644 /etc/devbox/warmup.env
@@ -187,10 +185,9 @@ phases:
             - grep -q "RUSTUP_HOME=/workspace/.rustup" /etc/environment || exit 1
             - grep -q "CARGO_HOME=/workspace/.cargo" /etc/environment || exit 1
             - grep -q "GOPATH=/workspace/go" /etc/environment || exit 1
-            - grep -q "DEVBOX_GITHUB_APP_ID=" /etc/environment || exit 1
-            - grep -q "DEVBOX_GITHUB_KEY_PARAM=" /etc/environment || exit 1
+            - grep -q "DEVBOX_SERVER_URL=" /etc/environment || exit 1
             - test -f /etc/devbox/warmup.env || exit 1
-            - grep -q "DEVBOX_GITHUB_KEY_PARAM=" /etc/devbox/warmup.env || exit 1
+            - grep -q "DEVBOX_SERVER_URL=" /etc/devbox/warmup.env || exit 1
             - echo "Agent, workspace, and environment verified on boot"
       # Attach the real workspace snapshot, mount it, and assert devbox-warmup
       # reaches active on the booted AMI. The orchestration lives in
