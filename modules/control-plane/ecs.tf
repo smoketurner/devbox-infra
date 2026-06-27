@@ -60,6 +60,8 @@ resource "aws_ecs_task_definition" "server" {
       { name = "AUTH_OIDC_CLIENT_ID", value = var.oidc_client_id },
       { name = "AUTH_OIDC_REDIRECT_URI", value = "https://${var.domain_name}/oauth2/idpresponse" },
       { name = "AUTH_OIDC_SCOPE", value = var.oidc_scope },
+      # AWS-account OIDC issuer for IAM Outbound Web Identity Federation (see iam.tf).
+      { name = "DEVBOX_AGENT_OIDC_ISSUER", value = data.aws_iam_outbound_web_identity_federation.agent_oidc.issuer_identifier },
     ]
 
     secrets = [

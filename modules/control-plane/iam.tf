@@ -24,3 +24,8 @@ resource "aws_iam_role_policy" "task" {
   role   = aws_iam_role.task.id
   policy = data.aws_iam_policy_document.task.json
 }
+
+# Account-level IAM Outbound Web Identity Federation: AWS hosts per-account OIDC
+# discovery endpoints so workloads can present AWS-signed OIDC tokens to external
+# services. Singleton per account; imported (already enabled) rather than created.
+resource "aws_iam_outbound_web_identity_federation" "agent_oidc" {}

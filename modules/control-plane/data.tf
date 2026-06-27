@@ -2,6 +2,11 @@ data "aws_caller_identity" "current" {}
 data "aws_partition" "current" {}
 data "aws_region" "current" {}
 
+# Resolves the account's OIDC issuer URL, fed to the server as DEVBOX_AGENT_OIDC_ISSUER.
+data "aws_iam_outbound_web_identity_federation" "agent_oidc" {
+  depends_on = [aws_iam_outbound_web_identity_federation.agent_oidc]
+}
+
 # ECS tasks assume-role trust (shared by the execution and task roles).
 data "aws_iam_policy_document" "ecs_tasks_assume_role" {
   statement {
