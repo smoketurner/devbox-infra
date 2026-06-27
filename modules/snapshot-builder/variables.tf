@@ -108,18 +108,8 @@ variable "ami_kms_key_arn" {
   type        = string
 }
 
-variable "github_app_private_key_param_arn" {
-  description = "ARN of the SSM SecureString parameter holding the GitHub App private key (PEM). The builder reads it to mint a read-only installation token for cloning."
-  type        = string
-}
-
-variable "github_app_private_key_param_name" {
-  description = "Name of the SSM SecureString parameter holding the GitHub App private key (PEM). Passed to the clone/warm script for `aws ssm get-parameter`."
-  type        = string
-}
-
-variable "github_app_id" {
-  description = "GitHub App ID (or Client ID) used as the JWT issuer when minting the installation token. Empty disables authenticated cloning (public repos only)."
+variable "control_plane_url" {
+  description = "Control-plane base URL (DEVBOX_SERVER_URL) the builder's agent requests repo-scoped GitHub tokens from. Empty disables authenticated cloning (public repos only)."
   type        = string
   default     = ""
 }

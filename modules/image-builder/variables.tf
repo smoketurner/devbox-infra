@@ -138,21 +138,15 @@ variable "devbox_agent_sha256" {
   default     = ""
 }
 
-# GitHub App config for the warming agent. Baked into the warmup service's
+# Control-plane URL for the warming agent. Baked into the warmup service's
 # EnvironmentFile (/etc/devbox/warmup.env) because the systemd unit does not read
 # /etc/environment, and also appended to /etc/environment so on-claim
-# `devbox-agent checkout` (which runs outside that unit) mints tokens too. All
-# non-secret; the App private key itself is read from SSM at run time via the host
-# instance profile.
+# `devbox-agent checkout` (which runs outside that unit) requests tokens too. All
+# non-secret; the agent authenticates to the control plane with this instance's
+# AWS identity and the App private key never lives on the box.
 
-variable "github_app_id" {
-  description = "GitHub App ID / Client ID the warming agent uses as the JWT issuer. Empty disables authenticated fetch (public repos only)."
-  type        = string
-  default     = ""
-}
-
-variable "github_app_key_param" {
-  description = "Name of the SSM SecureString parameter holding the GitHub App private key, read on-box by the warming agent (DEVBOX_GITHUB_KEY_PARAM)."
+variable "control_plane_url" {
+  description = "Control-plane base URL (DEVBOX_SERVER_URL) the warming agent requests repo-scoped GitHub tokens from. Empty disables authenticated fetch (public repos only)."
   type        = string
   default     = ""
 }
@@ -176,12 +170,6 @@ variable "workspace_snapshot_param" {
     condition     = startswith(var.workspace_snapshot_param, "/")
     error_message = "Workspace snapshot parameter name must start with /."
   }
-}
-
-variable "github_app_key_param_arn" {
-  description = "ARN of the SSM SecureString parameter holding the GitHub App private key. Granted to the build instance role so the test stage can run warm-up (mint a token) against the real AMI. Empty omits the grant."
-  type        = string
-  default     = ""
 }
 
 variable "enable_test_stage_workspace_mount" {

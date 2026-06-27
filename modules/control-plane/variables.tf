@@ -130,6 +130,39 @@ variable "oidc_scope" {
   default     = "openid email"
 }
 
+# --- GitHub App token minting (server-owned credential) ---
+
+variable "github_app_id" {
+  description = "GitHub App ID (or Client ID) the server signs App JWTs as (DEVBOX_GITHUB_APP_ID)."
+  type        = string
+}
+
+variable "github_app_key_param_name" {
+  description = "Name of the SSM SecureString parameter holding the GitHub App private key, read by the server's task role to mint tokens (DEVBOX_GITHUB_KEY_PARAM)."
+  type        = string
+}
+
+variable "github_app_key_param_arn" {
+  description = "ARN of the GitHub App private-key SSM parameter, granted to the task role for ssm:GetParameter."
+  type        = string
+}
+
+variable "agent_audience" {
+  description = "Expected `aud` on agent web-identity tokens (DEVBOX_AGENT_AUDIENCE); must equal the DEVBOX_SERVER_URL the boxes use to reach the control plane."
+  type        = string
+}
+
+variable "pool_role_arns" {
+  description = "IAM role ARNs of warm-pool hosts, trusted as agent callers (DEVBOX_POOL_ROLE_ARNS)."
+  type        = list(string)
+}
+
+variable "builder_role_arns" {
+  description = "IAM role ARNs of builder hosts (snapshot-builder, image-builder) trusted as agent callers (DEVBOX_BUILDER_ROLE_ARNS)."
+  type        = list(string)
+  default     = []
+}
+
 # --- CI/CD (GitHub Actions OIDC deploy role) ---
 
 variable "github_repository" {

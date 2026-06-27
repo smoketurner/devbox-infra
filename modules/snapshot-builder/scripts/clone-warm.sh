@@ -9,7 +9,7 @@
 #
 # Runs as root via SSM run-command (no shebang: the SSM agent picks the interpreter,
 # AL2023 /bin/sh is bash). Inputs arrive as DEVBOX_* env vars set by the run-command
-# preamble; the agent reads DEVBOX_GITHUB_* itself to mint tokens.
+# preamble; the agent reads DEVBOX_SERVER_URL itself to request tokens.
 set -euo pipefail
 
 MOUNT="${DEVBOX_MOUNT:-/workspace}"
@@ -80,8 +80,8 @@ rustup toolchain install stable --profile default --component clippy rustfmt rus
 rustup default stable
 
 # Delegate cloning and warm-hook execution to the agent baked into the golden AMI.
-# It mints a per-repo read-only installation token (reading the App key from SSM via
-# DEVBOX_GITHUB_KEY_PARAM/DEVBOX_GITHUB_APP_ID) and never writes credentials to disk.
+# It requests a per-repo read-only token from the control plane (DEVBOX_SERVER_URL),
+# authenticated by this instance's AWS identity, and never writes credentials to disk.
 # Absolute path: the non-login SSM shell may not have /usr/local/sbin on PATH. Repos
 # are passed as space-separated positional args.
 IFS=',' read -ra REPOS <<<"${DEVBOX_REPOS:-}"

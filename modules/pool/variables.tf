@@ -108,16 +108,10 @@ variable "workspace_volume_size" {
   }
 }
 
-variable "github_app_private_key_param_arn" {
-  description = "ARN of the SSM SecureString parameter holding the GitHub App private key, which the warming agent reads on-box to mint a read-only fetch token. Empty grants no read access (unauthenticated fetch)."
-  type        = string
-  default     = ""
-}
-
 variable "metadata_hop_limit" {
-  description = "IMDSv2 hop limit"
+  description = "IMDSv2 hop limit. 1 (the default) keeps instance-profile credentials reachable only from the host itself — not from a hop away (e.g. a user container) — which is the durable boundary now that the agent's only AWS need is its own web-identity token."
   type        = number
-  default     = 2
+  default     = 1
 }
 
 variable "ami_refresh_min_healthy_percentage" {

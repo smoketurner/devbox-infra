@@ -26,15 +26,14 @@ module "image_builder" {
     "05-docker-images.yml.tftpl",
   ]
 
-  # Bake the warming agent's GitHub App config into the AMI's warmup EnvironmentFile.
-  github_app_id        = var.github_app_id
-  github_app_key_param = aws_ssm_parameter.github_app_private_key.name
+  # The warming agent (and the test-stage warm-up) request repo-scoped GitHub
+  # tokens from the control plane, authenticated by the instance's AWS identity.
+  control_plane_url = "https://${var.domain_name}"
 
   # Exercise the real /workspace mount + warm-up in the test stage against the
   # booted AMI. The snapshot param is passed by literal name (not
   # module.snapshot_builder.ssm_parameter_name) because snapshot_builder already
   # depends on this module — a module reference here would be a dependency cycle.
-  github_app_key_param_arn          = aws_ssm_parameter.github_app_private_key.arn
   workspace_snapshot_param          = "/devbox/workspace-snapshot/latest"
   enable_test_stage_workspace_mount = true
 
@@ -63,9 +62,8 @@ module "snapshot_builder" {
 
   repos = var.workspace_repos
 
-  github_app_private_key_param_arn  = aws_ssm_parameter.github_app_private_key.arn
-  github_app_private_key_param_name = aws_ssm_parameter.github_app_private_key.name
-  github_app_id                     = var.github_app_id
+  # The builder's agent requests repo-scoped tokens from the control plane.
+  control_plane_url = "https://${var.domain_name}"
 
   tags = local.common_tags
 }
@@ -101,7 +99,6 @@ module "pool" {
   # A new snapshot id enters the Launch Template on the next apply; if the volume
   # fails to attach at runtime, the box falls back to /workspace on root (cold).
   workspace_snapshot_ssm_parameter = module.snapshot_builder.ssm_parameter_name
-  github_app_private_key_param_arn = aws_ssm_parameter.github_app_private_key.arn
 
   tags = local.common_tags
 }
@@ -156,4 +153,19 @@ module "control_plane" {
   # https://<domain_name>/oauth2/idpresponse) drives the app-side login flow.
   oidc_client_id     = var.oidc_client_id
   oidc_client_secret = var.oidc_client_secret
+
+  # Server-owned GitHub App token minting: the task role reads the key from SSM and
+  # mints repo-scoped tokens for agents authenticated by their AWS web-identity.
+  github_app_id             = var.github_app_id
+  github_app_key_param_name = aws_ssm_parameter.github_app_private_key.name
+  github_app_key_param_arn  = aws_ssm_parameter.github_app_private_key.arn
+
+  # Agents mint web-identity tokens for this audience (= the boxes' DEVBOX_SERVER_URL),
+  # and the server trusts these pool/builder role ARNs as agent callers.
+  agent_audience = "https://${var.domain_name}"
+  pool_role_arns = [module.pool.host_role_arn]
+  builder_role_arns = [
+    module.snapshot_builder.builder_instance_role_arn,
+    module.image_builder.build_instance_role_arn,
+  ]
 }

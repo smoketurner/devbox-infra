@@ -62,6 +62,15 @@ resource "aws_ecs_task_definition" "server" {
       { name = "AUTH_OIDC_SCOPE", value = var.oidc_scope },
       # AWS-account OIDC issuer for IAM Outbound Web Identity Federation (see iam.tf).
       { name = "DEVBOX_AGENT_OIDC_ISSUER", value = data.aws_iam_outbound_web_identity_federation.agent_oidc.issuer_identifier },
+      # Server-owned GitHub App: the server reads the key from SSM and mints
+      # repo-scoped tokens for agents authenticated by their web-identity token.
+      { name = "DEVBOX_GITHUB_APP_ID", value = var.github_app_id },
+      { name = "DEVBOX_GITHUB_KEY_PARAM", value = var.github_app_key_param_name },
+      # Agent-token trust: the audience the boxes mint for, and the role ARNs the
+      # server accepts as pool/builder callers (comma-separated).
+      { name = "DEVBOX_AGENT_AUDIENCE", value = var.agent_audience },
+      { name = "DEVBOX_POOL_ROLE_ARNS", value = join(",", var.pool_role_arns) },
+      { name = "DEVBOX_BUILDER_ROLE_ARNS", value = join(",", var.builder_role_arns) },
     ]
 
     secrets = [

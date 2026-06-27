@@ -10,8 +10,7 @@ locals {
   clone_warm_run_command = concat(
     [
       "export DEVBOX_REPOS='{{ Repos }}'",
-      "export DEVBOX_GITHUB_KEY_PARAM='{{ GitHubAppKeyParam }}'",
-      "export DEVBOX_GITHUB_APP_ID='{{ GitHubAppId }}'",
+      "export DEVBOX_SERVER_URL='{{ ControlPlaneUrl }}'",
       "export DEVBOX_MOUNT='{{ MountPoint }}'",
       "bash <<'DEVBOX_CLONE_WARM_EOF'",
     ],
@@ -78,14 +77,9 @@ resource "aws_ssm_document" "clone_warm" {
         type        = "String"
         description = "Comma-separated git clone URLs"
       }
-      GitHubAppKeyParam = {
+      ControlPlaneUrl = {
         type        = "String"
-        description = "SSM SecureString name holding the GitHub App private key (PEM)"
-        default     = ""
-      }
-      GitHubAppId = {
-        type        = "String"
-        description = "GitHub App ID / Client ID (JWT issuer)"
+        description = "Control-plane base URL the agent requests repo-scoped tokens from (DEVBOX_SERVER_URL)"
         default     = ""
       }
       MountPoint = {
@@ -198,10 +192,9 @@ resource "aws_ssm_document" "snapshot_build" {
             CloudWatchOutputEnabled = true
           }
           Parameters = {
-            Repos             = [join(",", var.repos)]
-            GitHubAppKeyParam = [var.github_app_private_key_param_name]
-            GitHubAppId       = [var.github_app_id]
-            MountPoint        = ["/workspace"]
+            Repos           = [join(",", var.repos)]
+            ControlPlaneUrl = [var.control_plane_url]
+            MountPoint      = ["/workspace"]
           }
         }
         nextStep = "describeDataVolume"

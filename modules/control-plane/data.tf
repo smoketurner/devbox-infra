@@ -83,4 +83,16 @@ data "aws_iam_policy_document" "task" {
     actions   = ["dsql:DbConnect"]
     resources = [aws_dsql_cluster.this.arn]
   }
+
+  # The control plane owns the GitHub App private key: it reads the SSM
+  # SecureString to sign App JWTs and mint repo-scoped installation tokens for
+  # devbox hosts. This is the only legitimate reader of the parameter (the pool
+  # and builder roles no longer can). SecureString on the default alias/aws/ssm
+  # key needs no explicit kms:Decrypt; add one only if it moves to a CMK.
+  statement {
+    sid       = "ReadGitHubAppKey"
+    effect    = "Allow"
+    actions   = ["ssm:GetParameter"]
+    resources = [var.github_app_key_param_arn]
+  }
 }

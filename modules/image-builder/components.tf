@@ -14,8 +14,7 @@ locals {
     key => endswith(f, ".tftpl") ? templatefile("${path.module}/components/${f}", {
       agent_url                 = var.devbox_agent_url
       agent_sha256              = var.devbox_agent_sha256
-      github_app_id             = var.github_app_id
-      github_app_key_param      = var.github_app_key_param
+      control_plane_url         = var.control_plane_url
       warmup_fetch_timeout_secs = var.warmup_fetch_timeout_secs
       docker_images             = join(" ", var.docker_images)
       workspace_snapshot_param  = var.workspace_snapshot_param

@@ -221,16 +221,17 @@ data "aws_iam_policy_document" "snapshot_events" {
   }
 }
 
-# Builder instance: read the GitHub App private key (to mint a clone token) and
-# write its run-command output to CloudWatch. EBS/KMS access for the data volume
-# is granted via the workspace key policy below; ec2 snapshot/run/terminate live
-# on the automation role, never on the token-holding box.
+# Builder instance: present its AWS identity to the control plane for a
+# repo-scoped clone token (the App private key is no longer on the box) and write
+# its run-command output to CloudWatch. EBS/KMS access for the data volume is
+# granted via the workspace key policy below; ec2 snapshot/run/terminate live on
+# the automation role, never on the token-holding box.
 data "aws_iam_policy_document" "builder_instance" {
   statement {
-    sid       = "ReadGitHubAppKey"
+    sid       = "GetWebIdentityToken"
     effect    = "Allow"
-    actions   = ["ssm:GetParameter", "ssm:GetParameters"]
-    resources = [var.github_app_private_key_param_arn]
+    actions   = ["sts:GetWebIdentityToken"]
+    resources = ["*"]
   }
 
   statement {
