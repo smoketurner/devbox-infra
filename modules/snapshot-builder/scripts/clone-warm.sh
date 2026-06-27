@@ -75,9 +75,12 @@ export XDG_CACHE_HOME="${MOUNT}/.cache"
 # Seed the default stable toolchain onto the volume so repos that do not pin a
 # toolchain build, and editors (rust-analyzer) work, on the claimant's box. Pinned
 # toolchains are installed automatically when a repo's warm hook runs cargo under
-# its rust-toolchain.toml.
-rustup toolchain install stable --profile default --component clippy rustfmt rust-analyzer
+# its rust-toolchain.toml. Components go through `rustup component add` (not
+# `install --component a b c`): rustup >=1.28 parses the trailing space-separated
+# values as toolchain names, failing with "invalid toolchain name".
+rustup toolchain install stable --profile default
 rustup default stable
+rustup component add clippy rustfmt rust-analyzer
 
 # Delegate cloning and warm-hook execution to the agent baked into the golden AMI.
 # It requests a per-repo read-only token from the control plane (DEVBOX_SERVER_URL),
