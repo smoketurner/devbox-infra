@@ -72,6 +72,15 @@ export GOCACHE="${MOUNT}/.cache/go/build"
 export UV_CACHE_DIR="${MOUNT}/.cache/uv"
 export XDG_CACHE_HOME="${MOUNT}/.cache"
 
+# Disable rustup's opportunistic self-update before any toolchain command. It
+# looks for its own binary at $CARGO_HOME/bin/rustup; CARGO_HOME is the freshly
+# formatted volume and the real rustup lives in /opt/rust/cargo, so the check
+# aborts with "rustup is not installed at '/workspace/.cargo'". `set` only writes
+# config, so it does not trigger the check itself; the setting persists to
+# $RUSTUP_HOME/settings.toml (=/workspace/.rustup) and rides the snapshot, so
+# claimant pool boxes (same custom CARGO_HOME via /etc/environment) inherit it.
+rustup set auto-self-update disable
+
 # Seed the default stable toolchain onto the volume so repos that do not pin a
 # toolchain build, and editors (rust-analyzer) work, on the claimant's box. Pinned
 # toolchains are installed automatically when a repo's warm hook runs cargo under
@@ -81,6 +90,13 @@ export XDG_CACHE_HOME="${MOUNT}/.cache"
 rustup toolchain install stable --profile default
 rustup default stable
 rustup component add clippy rustfmt rust-analyzer
+
+# Fail fast if the on-volume toolchain is not resolvable through RUSTUP_HOME: the
+# proxies on PATH live in /opt and dispatch to $RUSTUP_HOME/toolchains, which must
+# be on this volume to ride the snapshot. A broken/empty /workspace/.rustup would
+# otherwise only surface later inside a warm hook (or on the claimant's box).
+rustc --version
+cargo --version
 
 # Delegate cloning and warm-hook execution to the agent baked into the golden AMI.
 # It requests a per-repo read-only token from the control plane (DEVBOX_SERVER_URL),

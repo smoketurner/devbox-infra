@@ -118,6 +118,12 @@ phases:
               EOF
             - chmod 644 /etc/profile.d/rust.sh
             - source /etc/profile.d/rust.sh
+            # Disable rustup's opportunistic self-update (writes auto_self_update
+            # to /opt/rust/rustup/settings.toml). The on-volume RUSTUP_HOME carries
+            # its own setting via the snapshot; this covers the /opt fallback used
+            # when /etc/environment is not applied (AMI validation, non-PAM shells),
+            # where the custom CARGO_HOME otherwise makes self-update abort.
+            - rustup set auto-self-update disable
             - rustup component add clippy rustfmt rust-analyzer
       - name: InstallDocker
         action: ExecuteBash
