@@ -78,6 +78,8 @@ phases:
             - |
               cat >> /etc/environment <<'EOF'
               DEVBOX_SERVER_URL=${control_plane_url}
+              AWS_NEW_RETRIES_2026=true
+              AWS_DEFAULTS_MODE=in-region
               EOF
             - |
               cat > /etc/npmrc <<'EOF'
@@ -90,6 +92,8 @@ phases:
             - |
               cat > /etc/devbox/warmup.env <<'EOF'
               DEVBOX_SERVER_URL=${control_plane_url}
+              AWS_NEW_RETRIES_2026=true
+              AWS_DEFAULTS_MODE=in-region
               WARMUP_FETCH_TIMEOUT_SECS=${warmup_fetch_timeout_secs}
               EOF
             - chmod 0644 /etc/devbox/warmup.env

@@ -12,6 +12,8 @@ locals {
       "export DEVBOX_REPOS='{{ Repos }}'",
       "export DEVBOX_SERVER_URL='{{ ControlPlaneUrl }}'",
       "export DEVBOX_MOUNT='{{ MountPoint }}'",
+      "export AWS_NEW_RETRIES_2026=true",
+      "export AWS_DEFAULTS_MODE=in-region",
       "bash <<'DEVBOX_CLONE_WARM_EOF'",
     ],
     [local.clone_warm_script],
