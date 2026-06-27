@@ -46,6 +46,14 @@ resource "aws_ecs_task_definition" "server" {
       { name = "PORT", value = tostring(var.container_port) },
       { name = "AWS_REGION", value = local.aws_region },
       { name = "AWS_ACCOUNT_ID", value = local.aws_account_id },
+      # Opt into the AWS SDK's updated retry behavior ahead of its Nov 2026 default:
+      # fewer max attempts, shorter transient backoff, revised retry-quota costs.
+      # Retry strategy only — it does not add request timeouts.
+      { name = "AWS_NEW_RETRIES_2026", value = "true" },
+      # The task calls SSM/EC2/DSQL in its own region; in-region tunes the SDK's
+      # default connect/TLS timeouts tighter (~1.1s vs 3.1s) so connect failures
+      # fail fast. (Does not set a read/operation timeout.)
+      { name = "AWS_DEFAULTS_MODE", value = "in-region" },
       { name = "POOL_ID", value = var.pool_id },
       { name = "POOL_TARGET_WARM_SIZE", value = tostring(var.target_warm_pool_size) },
       { name = "RUST_LOG", value = "info,devbox_server=info" },
