@@ -35,6 +35,12 @@ DATA_DEV="$(resolve_data_device)" || {
   exit 1
 }
 echo "Formatting and mounting data device ${DATA_DEV} at ${MOUNT}"
+# The golden AMI ships an enabled workspace.mount unit (for pool instances) that
+# mounts /dev/disk/by-label/workspace at /workspace. On the builder we format and
+# mount the volume ourselves, so mask that unit first: otherwise systemd mounts the
+# device the instant mkfs sets LABEL=workspace and beats the mount below with
+# "already mounted on /workspace" (exit 32). Graceful if the unit is absent.
+systemctl mask --now workspace.mount 2>/dev/null || true
 mkfs.ext4 -F -L workspace "$DATA_DEV"
 mkdir -p "$MOUNT"
 # noatime to match the pool's workspace.mount and cut atime writes during the
@@ -98,6 +104,13 @@ rustup component add clippy rustfmt rust-analyzer
 rustc --version
 cargo --version
 
+# Snapshot prep must not leave a detached background `git gc`: git's default
+# gc.autoDetach=true forks one that can outlive `checkout` and keep holding
+# $MOUNT, failing the unmount below with "target is busy". Force any auto-gc the
+# agent's clones trigger to run in the foreground so it finishes before checkout
+# returns. Written system-wide so every git the agent spawns (any HOME) honors it.
+git config --system gc.autoDetach false
+
 # Delegate cloning and warm-hook execution to the agent baked into the golden AMI.
 # It requests a per-repo read-only token from the control plane (DEVBOX_SERVER_URL),
 # authenticated by this instance's AWS identity, and never writes credentials to disk.
@@ -107,9 +120,20 @@ IFS=',' read -ra REPOS <<<"${DEVBOX_REPOS:-}"
 /usr/local/sbin/devbox-agent checkout --workspace "$MOUNT" "${REPOS[@]}"
 
 # Quiesce: a clean unmount means no dirty journal -> no fsck on first pool mount.
+# Observed failure: a process spawned during the warm phase outlives `checkout`
+# and still holds $MOUNT, so umount fails with "target is busy". Identify exactly
+# what holds it (fuser -mv, printed so the next failure names the culprit), stop
+# those processes, and retry before refusing to snapshot.
 sync
-umount "$MOUNT" || {
-  echo "ERROR: failed to unmount ${MOUNT}; refusing to snapshot a dirty filesystem" >&2
-  exit 1
-}
+if ! umount "$MOUNT"; then
+  echo "umount ${MOUNT} busy; processes still holding it:" >&2
+  fuser -mv "$MOUNT" >&2 2>&1 || true
+  fuser -km "$MOUNT" 2>/dev/null || true
+  sleep 3
+  sync
+  umount "$MOUNT" || {
+    echo "ERROR: failed to unmount ${MOUNT} after stopping holders; refusing to snapshot a dirty filesystem" >&2
+    exit 1
+  }
+fi
 echo "Workspace data volume prepared and unmounted cleanly"

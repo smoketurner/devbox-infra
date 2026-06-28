@@ -202,6 +202,5 @@ phases:
         inputs:
           commands:
             - |
-              export DEVBOX_TEST_MOUNT_ENABLED="${enable_workspace_mount}"
               export DEVBOX_WORKSPACE_SNAPSHOT_PARAM="${workspace_snapshot_param}"
               ${indent(14, trimspace(test_workspace_mount_script))}

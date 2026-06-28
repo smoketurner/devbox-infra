@@ -70,7 +70,7 @@ variable "memory" {
 variable "log_retention_days" {
   description = "CloudWatch log retention for the service"
   type        = number
-  default     = 30
+  default     = 7
 }
 
 variable "dsql_deletion_protection" {

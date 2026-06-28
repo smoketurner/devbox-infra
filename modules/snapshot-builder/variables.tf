@@ -104,7 +104,7 @@ variable "clone_warm_timeout_seconds" {
 }
 
 variable "ami_kms_key_arn" {
-  description = "ARN of the KMS key the golden AMI's root snapshot is encrypted with (image-builder's CMK). The automation role calls RunInstances directly, so it must be able to use this key to launch the builder from the AMI; granted via IAM relying on the key's root-account delegation, which avoids a module cycle."
+  description = "ARN of the single devbox CMK (image-builder's key) used to encrypt both the golden AMI's root snapshot and this module's workspace data volume + snapshots. The automation and builder roles call RunInstances/use the volume directly, so they use this key via IAM relying on the key's root-account delegation, which avoids a module cycle."
   type        = string
 }
 
@@ -117,7 +117,7 @@ variable "control_plane_url" {
 variable "log_retention_days" {
   description = "CloudWatch log group retention period in days for builder run-command output"
   type        = number
-  default     = 30
+  default     = 7
 
   validation {
     condition = contains([
@@ -125,12 +125,6 @@ variable "log_retention_days" {
     ], var.log_retention_days)
     error_message = "Log retention days must be a valid CloudWatch retention value."
   }
-}
-
-variable "trusted_account_ids" {
-  description = "AWS account IDs allowed to use the workspace snapshot CMK (cross-account snapshot sharing)"
-  type        = list(string)
-  default     = []
 }
 
 variable "notification_emails" {

@@ -5,7 +5,7 @@
 ################################################################################
 
 resource "aws_kms_key" "ami" {
-  description             = "Encryption key for devbox golden AMI snapshots"
+  description             = "Encryption key for devbox golden AMI snapshots and workspace data-volume snapshots"
   deletion_window_in_days = 7
   enable_key_rotation     = true
   policy                  = data.aws_iam_policy_document.kms_key.json
@@ -27,7 +27,7 @@ resource "aws_kms_alias" "ami" {
 resource "aws_imagebuilder_image_recipe" "this" {
   name         = "${local.name_prefix}-recipe"
   parent_image = data.aws_ssm_parameter.al2023_ami.value
-  version      = "1.0.13"
+  version      = "1.0.14"
 
   dynamic "component" {
     for_each = sort(keys(local.component_map))

@@ -4,15 +4,10 @@
 # by filesystem label, then restarts devbox-warmup and asserts it reaches active.
 #
 # Injected into 04-devbox's test phase via templatefile/indent (no runtime S3
-# dependency). Reads two values from the environment, set by the calling step:
-#   DEVBOX_TEST_MOUNT_ENABLED       - "true" to run; anything else skips
+# dependency). Reads one value from the environment, set by the calling step:
 #   DEVBOX_WORKSPACE_SNAPSHOT_PARAM - SSM parameter name holding the snapshot id
+# Self-skips until a real snapshot exists, so it is a no-op on a bootstrap build.
 set -eu
-
-if [ "${DEVBOX_TEST_MOUNT_ENABLED:-false}" != "true" ]; then
-  echo "workspace-mount test disabled; skipping"
-  exit 0
-fi
 
 snap=$(aws ssm get-parameter --name "${DEVBOX_WORKSPACE_SNAPSHOT_PARAM}" --query 'Parameter.Value' --output text)
 echo "workspace snapshot param = ${snap}"

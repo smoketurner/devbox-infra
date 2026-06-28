@@ -30,12 +30,11 @@ module "image_builder" {
   # tokens from the control plane, authenticated by the instance's AWS identity.
   control_plane_url = "https://${var.domain_name}"
 
-  # Exercise the real /workspace mount + warm-up in the test stage against the
-  # booted AMI. The snapshot param is passed by literal name (not
+  # The test stage exercises the real /workspace mount + warm-up against the booted
+  # AMI. The snapshot param is passed by literal name (not
   # module.snapshot_builder.ssm_parameter_name) because snapshot_builder already
   # depends on this module — a module reference here would be a dependency cycle.
-  workspace_snapshot_param          = "/devbox/workspace-snapshot/latest"
-  enable_test_stage_workspace_mount = true
+  workspace_snapshot_param = "/devbox/workspace-snapshot/latest"
 
   # Base images pre-pulled into the AMI's /var/lib/docker so first container use is
   # warm. Sizing: the recipe root volume (and pool ebs_volume_size) must hold these.

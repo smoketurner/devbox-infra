@@ -22,26 +22,6 @@ locals {
 }
 
 ################################################################################
-# KMS key for the workspace snapshot
-################################################################################
-
-resource "aws_kms_key" "workspace" {
-  description             = "Encryption key for devbox workspace data-volume snapshots"
-  deletion_window_in_days = 7
-  enable_key_rotation     = true
-  policy                  = data.aws_iam_policy_document.kms_key.json
-
-  tags = merge(local.tags, {
-    Name = "${local.name_prefix}-workspace"
-  })
-}
-
-resource "aws_kms_alias" "workspace" {
-  name          = "alias/${local.name_prefix}-workspace"
-  target_key_id = aws_kms_key.workspace.key_id
-}
-
-################################################################################
 # SSM parameter: latest workspace snapshot id
 ################################################################################
 
@@ -156,7 +136,7 @@ resource "aws_ssm_document" "snapshot_build" {
               VolumeType          = "gp3"
               DeleteOnTermination = true
               Encrypted           = true
-              KmsKeyId            = aws_kms_key.workspace.arn
+              KmsKeyId            = var.ami_kms_key_arn
             }
           }]
           TagSpecifications = [

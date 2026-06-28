@@ -177,11 +177,10 @@ data "aws_iam_policy_document" "snapshot_automation" {
     }
   }
 
-  # Use both CMKs when launching the builder: the image-builder AMI key for the
-  # golden AMI's encrypted root volume (RunInstances creates the launch grant), and
-  # the workspace key for the encrypted data volume + snapshot. The AMI key's
-  # policy can't list this role without a module cycle, so access to it goes
-  # through IAM + that key's root-account delegation.
+  # Single CMK (var.ami_kms_key_arn) for both the golden AMI's encrypted root volume
+  # (RunInstances creates the launch grant) and the data volume + snapshot. The key's
+  # policy can't list this role without a module cycle, so access goes through IAM +
+  # the key's root-account delegation.
   statement {
     sid    = "UseEncryptionKeys"
     effect = "Allow"
@@ -193,7 +192,7 @@ data "aws_iam_policy_document" "snapshot_automation" {
       "kms:DescribeKey",
       "kms:CreateGrant",
     ]
-    resources = [aws_kms_key.workspace.arn, var.ami_kms_key_arn]
+    resources = [var.ami_kms_key_arn]
   }
 }
 
@@ -224,8 +223,9 @@ data "aws_iam_policy_document" "snapshot_events" {
 # Builder instance: present its AWS identity to the control plane for a
 # repo-scoped clone token (the App private key is no longer on the box) and write
 # its run-command output to CloudWatch. EBS/KMS access for the data volume is
-# granted via the workspace key policy below; ec2 snapshot/run/terminate live on
-# the automation role, never on the token-holding box.
+# granted by the UseDataVolumeKey statement below on the single CMK
+# (var.ami_kms_key_arn); ec2 snapshot/run/terminate live on the automation role,
+# never on the token-holding box.
 data "aws_iam_policy_document" "builder_instance" {
   statement {
     sid       = "GetWebIdentityToken"
@@ -249,41 +249,15 @@ data "aws_iam_policy_document" "builder_instance" {
     ]
     resources = ["${aws_cloudwatch_log_group.builds.arn}:*"]
   }
-}
 
-# Workspace snapshot CMK policy. Mirrors the image-builder AMI key: root manages,
-# the builder role uses it for the data volume, and the AutoScaling SLR can use it
-# (+ conditioned CreateGrant) so pool ASGs launch from the encrypted snapshot.
-data "aws_iam_policy_document" "kms_key" {
+  # The data volume is encrypted with the single CMK (var.ami_kms_key_arn) and
+  # attached to this instance. Encrypt + ReEncrypt* cover the async restore when a
+  # volume is created from the encrypted snapshot; granted via IAM on the key's
+  # root-account delegation because the key lives in image-builder, which can't list
+  # this role without a module cycle.
   statement {
-    sid    = "EnableRootAccountAccess"
+    sid    = "UseDataVolumeKey"
     effect = "Allow"
-
-    principals {
-      type        = "AWS"
-      identifiers = ["arn:${local.aws_partition}:iam::${local.aws_account_id}:root"]
-    }
-
-    actions   = ["kms:*"]
-    resources = ["*"]
-  }
-
-  # The builder instance profile (the volume is attached to it) and the automation
-  # role (the RunInstances caller that creates the EBS-encryption grant). EC2's EBS
-  # grant flow evaluates the key policy for the launching principal, so the
-  # automation role must be listed here, not only granted via IAM + root-enable.
-  statement {
-    sid    = "AllowBuilderUse"
-    effect = "Allow"
-
-    principals {
-      type = "AWS"
-      identifiers = [
-        aws_iam_role.builder_instance.arn,
-        aws_iam_role.snapshot_automation.arn,
-      ]
-    }
-
     actions = [
       "kms:Encrypt",
       "kms:Decrypt",
@@ -292,70 +266,7 @@ data "aws_iam_policy_document" "kms_key" {
       "kms:DescribeKey",
       "kms:CreateGrant",
     ]
-
-    resources = ["*"]
-  }
-
-  statement {
-    sid    = "AllowAutoScalingUse"
-    effect = "Allow"
-
-    principals {
-      type        = "AWS"
-      identifiers = [local.autoscaling_slr_arn]
-    }
-
-    actions = [
-      "kms:Encrypt",
-      "kms:Decrypt",
-      "kms:ReEncrypt*",
-      "kms:GenerateDataKey*",
-      "kms:DescribeKey",
-    ]
-
-    resources = ["*"]
-  }
-
-  statement {
-    sid    = "AllowAutoScalingCreateGrant"
-    effect = "Allow"
-
-    principals {
-      type        = "AWS"
-      identifiers = [local.autoscaling_slr_arn]
-    }
-
-    actions   = ["kms:CreateGrant"]
-    resources = ["*"]
-
-    condition {
-      test     = "Bool"
-      variable = "kms:GrantIsForAWSResource"
-      values   = ["true"]
-    }
-  }
-
-  dynamic "statement" {
-    for_each = length(var.trusted_account_ids) > 0 ? [1] : []
-    content {
-      sid    = "AllowCrossAccountUse"
-      effect = "Allow"
-
-      principals {
-        type        = "AWS"
-        identifiers = [for id in var.trusted_account_ids : "arn:${local.aws_partition}:iam::${id}:root"]
-      }
-
-      actions = [
-        "kms:Decrypt",
-        "kms:ReEncrypt*",
-        "kms:GenerateDataKey*",
-        "kms:DescribeKey",
-        "kms:CreateGrant",
-      ]
-
-      resources = ["*"]
-    }
+    resources = [var.ami_kms_key_arn]
   }
 }
 

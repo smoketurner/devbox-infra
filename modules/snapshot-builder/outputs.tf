@@ -8,11 +8,6 @@ output "ssm_parameter_arn" {
   value       = aws_ssm_parameter.workspace_snapshot.arn
 }
 
-output "kms_key_arn" {
-  description = "ARN of the KMS key the workspace snapshot is encrypted with"
-  value       = aws_kms_key.workspace.arn
-}
-
 output "automation_document_name" {
   description = "Name of the SSM Automation document that builds the snapshot"
   value       = aws_ssm_document.snapshot_build.name

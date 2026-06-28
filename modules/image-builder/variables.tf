@@ -64,7 +64,7 @@ variable "image_tests_timeout_minutes" {
 variable "log_retention_days" {
   description = "CloudWatch log group retention period in days"
   type        = number
-  default     = 30
+  default     = 7
 
   validation {
     condition = contains([
@@ -170,12 +170,6 @@ variable "workspace_snapshot_param" {
     condition     = startswith(var.workspace_snapshot_param, "/")
     error_message = "Workspace snapshot parameter name must start with /."
   }
-}
-
-variable "enable_test_stage_workspace_mount" {
-  description = "Exercise the real /workspace mount + warm-up in the test stage: attach the workspace snapshot, mount it, and assert devbox-warmup reaches active. Adds EC2 volume / KMS / SSM grants to the build instance role and a data lookup on the workspace KMS alias. Keep false until snapshot-builder is applied (the alias must exist)."
-  type        = bool
-  default     = false
 }
 
 variable "warmup_fetch_timeout_secs" {

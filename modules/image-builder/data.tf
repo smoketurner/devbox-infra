@@ -125,24 +125,13 @@ data "aws_ssm_parameter" "al2023_ami" {
   name = "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.18-arm64"
 }
 
-# Workspace snapshot CMK, resolved by alias to avoid a module cycle with
-# snapshot-builder (which already depends on this module). The key's policy
-# delegates to the account root, so the IAM grant below is sufficient — no
-# snapshot-builder change. Gated on the test-mount toggle so a bootstrap apply
-# (before snapshot-builder exists) does not fail resolving a missing alias.
-data "aws_kms_key" "workspace" {
-  count  = var.enable_test_stage_workspace_mount ? 1 : 0
-  key_id = "alias/${var.name_prefix}-snapshot-builder-workspace"
-}
-
 # Test-stage workspace-mount permissions for the build instance role (used by both
 # build and test instances). Lets the test instance create + attach the workspace
 # snapshot volume, mount it, and run warm-up against the real AMI. Scoped by
-# region/tag/key; the destructive ops (detach/delete) are limited to volumes this
-# test created (devbox:role=workspace-test).
+# region/tag; the destructive ops (detach/delete) are limited to volumes this test
+# created (devbox:role=workspace-test). KMS access to the (single) CMK comes from
+# the key's own policy (AllowImageBuilderAndEC2 lists this role), not this document.
 data "aws_iam_policy_document" "build_instance_test_mount" {
-  count = var.enable_test_stage_workspace_mount ? 1 : 0
-
   statement {
     sid       = "ReadSnapshotParam"
     effect    = "Allow"
@@ -157,24 +146,6 @@ data "aws_iam_policy_document" "build_instance_test_mount" {
     effect    = "Allow"
     actions   = ["sts:GetWebIdentityToken"]
     resources = ["*"]
-  }
-
-  # Full EBS-encryption action set, matching the snapshot-builder roles and the
-  # AutoScaling SLR that are already allowed on this key. Encrypt + ReEncrypt* are
-  # required for the async restore when creating an encrypted volume from the
-  # encrypted snapshot; without them the volume errors out and EC2 deletes it.
-  statement {
-    sid    = "UseWorkspaceKey"
-    effect = "Allow"
-    actions = [
-      "kms:Encrypt",
-      "kms:Decrypt",
-      "kms:ReEncrypt*",
-      "kms:GenerateDataKey*",
-      "kms:DescribeKey",
-      "kms:CreateGrant",
-    ]
-    resources = [data.aws_kms_key.workspace[0].arn]
   }
 
   # Create the volume, attach it to this ephemeral test instance, and flip its
