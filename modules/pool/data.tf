@@ -81,6 +81,75 @@ data "aws_iam_policy_document" "ami_refresh_events" {
   }
 }
 
+# Snapshot-refresh automation role: read the snapshot parameter, clone the launch
+# template with the new snapshot id, and start an instance refresh on this ASG.
+data "aws_iam_policy_document" "snapshot_refresh_automation" {
+  statement {
+    sid       = "ReadSnapshotParameter"
+    effect    = "Allow"
+    actions   = ["ssm:GetParameter"]
+    resources = ["arn:${local.aws_partition}:ssm:${local.aws_region}:${local.aws_account_id}:parameter${var.workspace_snapshot_ssm_parameter}"]
+  }
+
+  statement {
+    sid       = "CreateLaunchTemplateVersion"
+    effect    = "Allow"
+    actions   = ["ec2:CreateLaunchTemplateVersion"]
+    resources = [aws_launch_template.pool.arn]
+  }
+
+  # Describe actions do not support resource-level permissions.
+  statement {
+    sid    = "DescribeLaunchTemplates"
+    effect = "Allow"
+    actions = [
+      "ec2:DescribeLaunchTemplateVersions",
+      "ec2:DescribeLaunchTemplates",
+    ]
+    resources = ["*"]
+  }
+
+  statement {
+    sid       = "StartInstanceRefresh"
+    effect    = "Allow"
+    actions   = ["autoscaling:StartInstanceRefresh"]
+    resources = [aws_autoscaling_group.pool.arn]
+  }
+
+  statement {
+    sid    = "DescribeRefresh"
+    effect = "Allow"
+    actions = [
+      "autoscaling:DescribeInstanceRefreshes",
+      "autoscaling:DescribeAutoScalingGroups",
+    ]
+    resources = ["*"]
+  }
+}
+
+# Snapshot-refresh EventBridge role: start the automation and pass it its role.
+data "aws_iam_policy_document" "snapshot_refresh_events" {
+  statement {
+    sid       = "StartAutomation"
+    effect    = "Allow"
+    actions   = ["ssm:StartAutomationExecution"]
+    resources = ["arn:${local.aws_partition}:ssm:${local.aws_region}:${local.aws_account_id}:automation-definition/${aws_ssm_document.snapshot_refresh.name}:*"]
+  }
+
+  statement {
+    sid       = "PassAutomationRole"
+    effect    = "Allow"
+    actions   = ["iam:PassRole"]
+    resources = [aws_iam_role.snapshot_refresh_automation.arn]
+
+    condition {
+      test     = "StringEquals"
+      variable = "iam:PassedToService"
+      values   = ["ssm.${local.aws_dns_suffix}"]
+    }
+  }
+}
+
 # IAM policy documents
 
 data "aws_iam_policy_document" "host_assume_role" {

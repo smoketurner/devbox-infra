@@ -60,3 +60,71 @@ resource "aws_cloudwatch_event_target" "ami_refresh" {
   arn      = "arn:${local.aws_partition}:ssm:${local.aws_region}:${local.aws_account_id}:automation-definition/${aws_ssm_document.ami_refresh.name}:${aws_ssm_document.ami_refresh.default_version}"
   role_arn = aws_iam_role.ami_refresh_events.arn
 }
+
+# Workspace-snapshot rollout via launch-template re-point + ASG instance refresh
+#
+# Unlike the AMI (resolved through resolve:ssm in the launch template's image_id),
+# the workspace snapshot id is a *literal* block-device-mapping value read by
+# Terraform at plan time, so a newly published snapshot never reaches the running
+# pool on its own. When the snapshot-builder updates the snapshot parameter, an
+# EventBridge rule starts an SSM Automation whose script clones the launch
+# template's $Latest with the new snapshot id on the workspace device, then starts
+# a rolling instance refresh. Claimed hosts are scale-in protected, so the refresh
+# (ScaleInProtectedInstances = Ignore) skips them and rolls only unclaimed warm
+# hosts; Claimed hosts adopt the new snapshot when released and replaced. The
+# script is idempotent — a no-op when $Latest already carries the snapshot.
+
+resource "aws_ssm_document" "snapshot_refresh" {
+  name            = "${local.name_prefix}-snapshot-refresh"
+  document_type   = "Automation"
+  document_format = "JSON"
+
+  content = jsonencode({
+    schemaVersion = "0.3"
+    description   = "Re-point the launch template at the latest workspace snapshot and roll unclaimed warm hosts"
+    assumeRole    = aws_iam_role.snapshot_refresh_automation.arn
+    mainSteps = [{
+      name   = "repointAndRefresh"
+      action = "aws:executeScript"
+      isEnd  = true
+      inputs = {
+        Runtime = "python3.11"
+        Handler = "handler"
+        InputPayload = {
+          LaunchTemplateId     = aws_launch_template.pool.id
+          AsgName              = local.asg_name
+          WorkspaceDevice      = local.workspace_device
+          WorkspaceVolumeSize  = var.workspace_volume_size
+          SnapshotParameter    = var.workspace_snapshot_ssm_parameter
+          MinHealthyPercentage = var.ami_refresh_min_healthy_percentage
+          InstanceWarmup       = var.ami_refresh_instance_warmup
+        }
+        Script = file("${path.module}/scripts/snapshot-refresh.py")
+      }
+    }]
+  })
+
+  tags = local.tags
+}
+
+resource "aws_cloudwatch_event_rule" "workspace_snapshot_published" {
+  name        = "${local.name_prefix}-workspace-snapshot-published"
+  description = "Roll the pool onto a new workspace snapshot when its parameter is updated"
+
+  event_pattern = jsonencode({
+    source      = ["aws.ssm"]
+    detail-type = ["Parameter Store Change"]
+    detail = {
+      name      = [var.workspace_snapshot_ssm_parameter]
+      operation = ["Create", "Update"]
+    }
+  })
+
+  tags = local.tags
+}
+
+resource "aws_cloudwatch_event_target" "snapshot_refresh" {
+  rule     = aws_cloudwatch_event_rule.workspace_snapshot_published.name
+  arn      = "arn:${local.aws_partition}:ssm:${local.aws_region}:${local.aws_account_id}:automation-definition/${aws_ssm_document.snapshot_refresh.name}:${aws_ssm_document.snapshot_refresh.default_version}"
+  role_arn = aws_iam_role.snapshot_refresh_events.arn
+}
