@@ -47,6 +47,18 @@ resource "aws_route53_record" "control_plane" {
   }
 }
 
+resource "aws_route53_record" "control_plane_ipv6" {
+  zone_id = var.route53_zone_id
+  name    = var.domain_name
+  type    = "AAAA"
+
+  alias {
+    name                   = aws_lb.this.dns_name
+    zone_id                = aws_lb.this.zone_id
+    evaluate_target_health = true
+  }
+}
+
 moved {
   from = aws_route53_record.alb
   to   = aws_route53_record.control_plane

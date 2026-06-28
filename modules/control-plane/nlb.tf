@@ -24,6 +24,17 @@ resource "aws_vpc_security_group_ingress_rule" "nlb_https" {
   cidr_ipv4         = each.value
 }
 
+resource "aws_vpc_security_group_ingress_rule" "nlb_https_ipv6" {
+  for_each = toset(var.ingress_ipv6_cidrs)
+
+  security_group_id = aws_security_group.nlb.id
+  description       = "HTTPS from allowed networks (IPv6)"
+  ip_protocol       = "tcp"
+  from_port         = 443
+  to_port           = 443
+  cidr_ipv6         = each.value
+}
+
 resource "aws_vpc_security_group_egress_rule" "nlb_to_tasks" {
   security_group_id            = aws_security_group.nlb.id
   description                  = "Forward to the control-plane tasks"
@@ -59,6 +70,15 @@ resource "aws_vpc_security_group_egress_rule" "service_https" {
   cidr_ipv4         = "0.0.0.0/0"
 }
 
+resource "aws_vpc_security_group_egress_rule" "service_https_ipv6" {
+  security_group_id = aws_security_group.service.id
+  description       = "Outbound HTTPS (AWS APIs, ECR, DSQL token signing) (IPv6)"
+  ip_protocol       = "tcp"
+  from_port         = 443
+  to_port           = 443
+  cidr_ipv6         = "::/0"
+}
+
 resource "aws_vpc_security_group_egress_rule" "service_dsql" {
   security_group_id = aws_security_group.service.id
   description       = "Outbound to Aurora DSQL public endpoint (PostgreSQL wire protocol)"
@@ -66,6 +86,15 @@ resource "aws_vpc_security_group_egress_rule" "service_dsql" {
   from_port         = 5432
   to_port           = 5432
   cidr_ipv4         = "0.0.0.0/0"
+}
+
+resource "aws_vpc_security_group_egress_rule" "service_dsql_ipv6" {
+  security_group_id = aws_security_group.service.id
+  description       = "Outbound to Aurora DSQL public endpoint (PostgreSQL wire protocol) (IPv6)"
+  ip_protocol       = "tcp"
+  from_port         = 5432
+  to_port           = 5432
+  cidr_ipv6         = "::/0"
 }
 
 # Static public IP for the NLB so the hostname maps to a stable address.
@@ -80,7 +109,10 @@ resource "aws_lb" "this" {
   internal           = false
   load_balancer_type = "network"
   security_groups    = [aws_security_group.nlb.id]
+  ip_address_type    = "dualstack"
 
+  # The EIP carries the static IPv4; AWS auto-assigns the node's IPv6 from the
+  # subnet's IPv6 CIDR (the control-plane VPC's public subnet is dual-stack).
   subnet_mapping {
     subnet_id     = var.subnet_ids[0]
     allocation_id = aws_eip.nlb.id

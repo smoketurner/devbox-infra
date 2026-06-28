@@ -23,6 +23,12 @@ variable "ingress_cidrs" {
   type        = list(string)
 }
 
+variable "ingress_ipv6_cidrs" {
+  description = "IPv6 CIDRs allowed to reach the dual-stack NLB on 443 (empty disables IPv6 ingress)"
+  type        = list(string)
+  default     = []
+}
+
 variable "pool_id" {
   description = "Pool identifier the reconciler adopts (ASG = devbox-pool-<pool_id>)"
   type        = string

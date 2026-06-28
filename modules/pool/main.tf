@@ -31,6 +31,19 @@ resource "aws_vpc_security_group_egress_rule" "https" {
   })
 }
 
+resource "aws_vpc_security_group_egress_rule" "https_ipv6" {
+  security_group_id = aws_security_group.pool.id
+  description       = "Allow outbound HTTPS traffic (IPv6)"
+  ip_protocol       = "tcp"
+  from_port         = 443
+  to_port           = 443
+  cidr_ipv6         = "::/0"
+
+  tags = merge(local.tags, {
+    Name = "${local.name_prefix}-egress-https-ipv6"
+  })
+}
+
 ################################################################################
 # Launch Template
 ################################################################################
