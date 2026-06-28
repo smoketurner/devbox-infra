@@ -238,6 +238,11 @@ data "aws_iam_policy_document" "builder_instance" {
     sid    = "WriteBuildLogs"
     effect = "Allow"
     actions = [
+      # CreateLogGroup is required even though Terraform pre-creates the group: the
+      # SSM agent's CloudWatch uploader calls it up front and, lacking the action,
+      # gets AccessDenied and silently abandons the whole upload (CWUrl stays null,
+      # no streams). The other three are the actual stream writes.
+      "logs:CreateLogGroup",
       "logs:CreateLogStream",
       "logs:PutLogEvents",
       "logs:DescribeLogStreams",

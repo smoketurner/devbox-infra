@@ -101,6 +101,10 @@ data "aws_iam_policy" "ssm_core" {
   name = "AmazonSSMManagedInstanceCore"
 }
 
+data "aws_iam_policy" "cloudwatch_agent" {
+  name = "CloudWatchAgentServerPolicy"
+}
+
 # Host runtime: the warm-up agent self-tags its own instance devbox:ready=true.
 # "Own instance only" is not expressible in IAM (no policy variable for the
 # caller's own instance id), so this is scoped as tightly as a shared instance

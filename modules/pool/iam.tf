@@ -17,6 +17,11 @@ resource "aws_iam_role_policy_attachment" "host_ssm" {
   policy_arn = data.aws_iam_policy.ssm_core.arn
 }
 
+resource "aws_iam_role_policy_attachment" "host_cloudwatch_agent" {
+  role       = aws_iam_role.host.name
+  policy_arn = data.aws_iam_policy.cloudwatch_agent.arn
+}
+
 resource "aws_iam_role_policy" "host_runtime" {
   name   = "${local.name_prefix}-host-runtime"
   role   = aws_iam_role.host.id
