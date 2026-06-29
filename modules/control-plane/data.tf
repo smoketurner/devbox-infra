@@ -52,8 +52,9 @@ data "aws_iam_policy_document" "task" {
     resources = ["*"]
   }
 
-  # The reconciler (apply_pending_owner_tags) is the only CreateTags caller and
-  # writes exactly devbox:owner (always) and devbox:owner-email (when present).
+  # The claim handler (inline, at claim time) and the reconciler
+  # (apply_pending_owner_tags, re-asserting) are the CreateTags callers; both
+  # write exactly devbox:owner (always) and devbox:owner-email (when present).
   statement {
     sid       = "EC2CreateTags"
     effect    = "Allow"

@@ -105,15 +105,23 @@ phases:
             - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile default
             # PATH carries the rustup proxy binaries plus the on-volume
             # cargo-install bin dir (cargo installs into $CARGO_HOME/bin); the
-            # proxies stay first so they can't be shadowed. Both RUSTUP_HOME and
-            # CARGO_HOME are left to /etc/environment (=/workspace/.rustup and
-            # /workspace/.cargo) so the warmed on-volume toolchain and cache win
-            # for login shells instead of resetting to /opt. The fallback below
-            # fires only when /etc/environment was not applied (AMI validation,
-            # non-PAM shells), keeping the baked toolchain reachable then.
+            # proxies stay first so they can't be shadowed. RUSTUP_HOME and
+            # CARGO_HOME are set here directly to the on-volume homes whenever the
+            # workspace snapshot volume is present, so the warmed toolchain and
+            # cargo cache win for EVERY shell — login or not — instead of riding
+            # on /etc/environment (PAM) alone, which a non-login shell or an edge
+            # PAM config can skip, silently bypassing the warmed caches. When the
+            # volume is absent (AMI validation, non-PAM shells on a box whose
+            # volume didn't attach) the baked /opt toolchain remains reachable.
             - |
               cat > /etc/profile.d/rust.sh <<'EOF'
-              export RUSTUP_HOME=${RUSTUP_HOME:-/opt/rust/rustup}
+              if [ -d /workspace/.rustup/toolchains ]; then
+                export RUSTUP_HOME=/workspace/.rustup
+                export CARGO_HOME=/workspace/.cargo
+              else
+                export RUSTUP_HOME=${RUSTUP_HOME:-/opt/rust/rustup}
+                export CARGO_HOME=${CARGO_HOME:-/opt/rust/cargo}
+              fi
               export PATH=/opt/rust/cargo/bin:/workspace/.cargo/bin:$PATH
               EOF
             - chmod 644 /etc/profile.d/rust.sh

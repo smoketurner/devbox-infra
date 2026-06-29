@@ -88,7 +88,7 @@ resource "aws_launch_template" "pool" {
     for_each = startswith(data.aws_ssm_parameter.workspace_snapshot.value, "snap-") ? [1] : []
 
     content {
-      device_name = "/dev/sdb"
+      device_name = local.workspace_device
 
       ebs {
         snapshot_id           = data.aws_ssm_parameter.workspace_snapshot.value

@@ -10,6 +10,11 @@ locals {
   # Naming contract (shared with control plane)
   asg_name = "devbox-pool-${var.pool_id}"
 
+  # Block device the workspace snapshot volume attaches at. Referenced by both the
+  # launch template (where it is baked) and the snapshot-refresh automation (which
+  # swaps the snapshot id on this device when a new snapshot is published).
+  workspace_device = "/dev/sdb"
+
   tags = merge(
     var.tags,
     {
