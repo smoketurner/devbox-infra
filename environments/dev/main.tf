@@ -83,9 +83,11 @@ module "pool" {
   # pre-pulled Docker images (see image_builder recipe volume_size).
   ebs_volume_size = 100
 
-  # Cap the pool: the reconciler sets desired_capacity to
-  # min(claimed + POOL_TARGET_WARM_SIZE, max_size). With POOL_TARGET_WARM_SIZE=2,
-  # max_size = 1 holds a single warm instance.
+  # Pool sizing: the reconciler is adopt-only and reads both values from the ASG,
+  # setting desired_capacity to min(claimed + min_size, max_size). min_size is the
+  # warm-pool target; with max_size = 1 the warm box is given up while a claim is
+  # active.
+  min_size = 1
   max_size = 1
 
   # Consume the parameter name from image-builder so Terraform orders the

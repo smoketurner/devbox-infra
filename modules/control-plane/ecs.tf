@@ -55,7 +55,6 @@ resource "aws_ecs_task_definition" "server" {
       # fail fast. (Does not set a read/operation timeout.)
       { name = "AWS_DEFAULTS_MODE", value = "in-region" },
       { name = "POOL_ID", value = var.pool_id },
-      { name = "POOL_TARGET_WARM_SIZE", value = tostring(var.target_warm_pool_size) },
       { name = "RUST_LOG", value = "info,devbox_server=info" },
       # API authentication is always on server-side (no toggle): it validates
       # Vouch bearer tokens app-side using the issuer (audience not checked); the

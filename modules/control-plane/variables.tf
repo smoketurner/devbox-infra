@@ -35,12 +35,6 @@ variable "pool_id" {
   default     = "default"
 }
 
-variable "target_warm_pool_size" {
-  description = "Number of unclaimed Ready instances the reconciler maintains"
-  type        = number
-  default     = 2
-}
-
 # --- Container / service sizing ---
 
 variable "image_tag" {
