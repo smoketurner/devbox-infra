@@ -183,6 +183,20 @@ variable "github_allowed_refs" {
   default     = ["ref:refs/heads/main", "ref:refs/tags/*"]
 }
 
+# --- Durable sessions (release --keep / claim --resume) ---
+
+variable "session_ttl_days" {
+  description = "Days an archived session survives; feeds both the bucket lifecycle rule and the server's SESSION_TTL_DAYS so records and objects expire on the same clock"
+  type        = number
+  default     = 30
+}
+
+variable "session_archive_timeout_secs" {
+  description = "Seconds the reconciler waits for a box to upload its session archive before failing the session and terminating anyway (SESSION_ARCHIVE_TIMEOUT_SECS, 60-3600)"
+  type        = number
+  default     = 600
+}
+
 variable "tags" {
   description = "Additional tags to apply to all resources"
   type        = map(string)

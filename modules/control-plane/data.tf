@@ -53,8 +53,10 @@ data "aws_iam_policy_document" "task" {
   }
 
   # The claim handler (inline, at claim time) and the reconciler
-  # (apply_pending_owner_tags, re-asserting) are the CreateTags callers; both
-  # write exactly devbox:owner (always) and devbox:owner-email (when present).
+  # (apply_pending_owner_tags / the Archiving step, re-asserting) are the
+  # CreateTags callers: devbox:owner (always) and devbox:owner-email plus
+  # devbox:session-restore (when present) at claim; devbox:archive-session at
+  # release --keep.
   statement {
     sid       = "EC2CreateTags"
     effect    = "Allow"
@@ -64,7 +66,12 @@ data "aws_iam_policy_document" "task" {
     condition {
       test     = "ForAllValues:StringEquals"
       variable = "aws:TagKeys"
-      values   = ["devbox:owner", "devbox:owner-email"]
+      values = [
+        "devbox:owner",
+        "devbox:owner-email",
+        "devbox:session-restore",
+        "devbox:archive-session",
+      ]
     }
 
     # Scope to instances in this pool's ASG. The server tags the just-claimed
@@ -95,5 +102,19 @@ data "aws_iam_policy_document" "task" {
     effect    = "Allow"
     actions   = ["ssm:GetParameter"]
     resources = [var.github_app_key_param_arn]
+  }
+
+  # Session archives: the server presigns PUT (archive upload at release
+  # --keep) and GET (restore at claim --resume) URLs against this role — a
+  # presigned URL executes with the signer's permissions, so these are the only
+  # S3 grants in the platform (devbox hosts have none).
+  statement {
+    sid    = "SessionArchives"
+    effect = "Allow"
+    actions = [
+      "s3:PutObject",
+      "s3:GetObject",
+    ]
+    resources = ["${aws_s3_bucket.sessions.arn}/sessions/*"]
   }
 }

@@ -78,6 +78,11 @@ resource "aws_ecs_task_definition" "server" {
       { name = "DEVBOX_AGENT_AUDIENCE", value = var.agent_audience },
       { name = "DEVBOX_POOL_ROLE_ARNS", value = join(",", var.pool_role_arns) },
       { name = "DEVBOX_BUILDER_ROLE_ARNS", value = join(",", var.builder_role_arns) },
+      # Durable sessions: presence of the bucket enables release --keep /
+      # claim --resume; records and objects share the TTL clock (s3.tf).
+      { name = "DEVBOX_SESSION_BUCKET", value = aws_s3_bucket.sessions.bucket },
+      { name = "SESSION_TTL_DAYS", value = tostring(var.session_ttl_days) },
+      { name = "SESSION_ARCHIVE_TIMEOUT_SECS", value = tostring(var.session_archive_timeout_secs) },
     ]
 
     secrets = [
