@@ -59,6 +59,11 @@ resource "aws_cloudwatch_event_target" "ami_refresh" {
   rule     = aws_cloudwatch_event_rule.ami_published.name
   arn      = "arn:${local.aws_partition}:ssm:${local.aws_region}:${local.aws_account_id}:automation-definition/${aws_ssm_document.ami_refresh.name}:${aws_ssm_document.ami_refresh.default_version}"
   role_arn = aws_iam_role.ami_refresh_events.arn
+
+  # Without an explicit input, EventBridge passes the whole Parameter Store
+  # Change event as the automation's parameters; the document declares none, so
+  # StartAutomationExecution rejects it and the invocation fails silently.
+  input = jsonencode({})
 }
 
 # Workspace-snapshot rollout via launch-template re-point + ASG instance refresh
@@ -127,4 +132,8 @@ resource "aws_cloudwatch_event_target" "snapshot_refresh" {
   rule     = aws_cloudwatch_event_rule.workspace_snapshot_published.name
   arn      = "arn:${local.aws_partition}:ssm:${local.aws_region}:${local.aws_account_id}:automation-definition/${aws_ssm_document.snapshot_refresh.name}:${aws_ssm_document.snapshot_refresh.default_version}"
   role_arn = aws_iam_role.snapshot_refresh_events.arn
+
+  # Same as ami_refresh: the document takes no parameters, so the default
+  # pass-the-event input would fail StartAutomationExecution.
+  input = jsonencode({})
 }
