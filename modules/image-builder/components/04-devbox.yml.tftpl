@@ -141,10 +141,6 @@ phases:
 
               [Service]
               Type=simple
-              # The session-restore step (claim --resume) talks to the control
-              # plane; systemd units do not read /etc/environment, so the same
-              # env file the other agent services use supplies DEVBOX_SERVER_URL.
-              EnvironmentFile=-/etc/devbox/warmup.env
               ExecStart=/usr/local/sbin/devbox-agent owner-sync
               # owner-sync exits 0 once it has provisioned the claimant's account;
               # only restart on failure so a clean exit stays stopped.
@@ -158,35 +154,6 @@ phases:
               EOF
             - systemctl daemon-reload
             - systemctl enable devbox-owner-sync.service
-      - name: InstallSessionWatchService
-        action: ExecuteBash
-        inputs:
-          commands:
-            - echo "Installing devbox-session-watch.service"
-            - |
-              cat > /etc/systemd/system/devbox-session-watch.service <<'EOF'
-              [Unit]
-              Description=Devbox session-watch (archive the session on release --keep)
-              After=network-online.target workspace.mount
-              Wants=network-online.target
-
-              [Service]
-              Type=simple
-              # DEVBOX_SERVER_URL for the presigned-URL and archive-done calls.
-              EnvironmentFile=-/etc/devbox/warmup.env
-              ExecStart=/usr/local/sbin/devbox-agent session-watch
-              # session-watch exits 0 after archiving (the box terminates); keep
-              # it alive through transient failures while waiting for the tag.
-              Restart=on-failure
-              RestartSec=5
-              StandardOutput=journal
-              StandardError=journal
-
-              [Install]
-              WantedBy=multi-user.target
-              EOF
-            - systemctl daemon-reload
-            - systemctl enable devbox-session-watch.service
   - name: validate
     steps:
       - name: ValidateDevbox
@@ -199,7 +166,6 @@ phases:
             - /usr/local/sbin/devbox-agent --version || exit 1
             - systemctl is-enabled devbox-warmup.service || exit 1
             - systemctl is-enabled devbox-owner-sync.service || exit 1
-            - systemctl is-enabled devbox-session-watch.service || exit 1
             - grep -q "noatime" /etc/systemd/system/workspace.mount || exit 1
   - name: test
     steps:
@@ -210,7 +176,6 @@ phases:
             - echo "=== Testing devbox services on the booted AMI ==="
             - systemctl is-enabled devbox-warmup.service || exit 1
             - systemctl is-enabled devbox-owner-sync.service || exit 1
-            - systemctl is-enabled devbox-session-watch.service || exit 1
             - echo "Devbox services verified on boot"
       - name: TestDevboxAgentAndConfig
         action: ExecuteBash
