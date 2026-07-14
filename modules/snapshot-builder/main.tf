@@ -96,6 +96,17 @@ resource "aws_ssm_document" "snapshot_build" {
     schemaVersion = "0.3"
     description   = "Build an encrypted workspace EBS snapshot and publish its id"
     assumeRole    = aws_iam_role.snapshot_automation.arn
+    # StartAutomationExecution rejects an empty parameters map, and an
+    # EventBridge target with no input passes the whole event as parameters —
+    # so the document declares one no-op parameter for the target to pass.
+    # The default keeps manual starts parameterless.
+    parameters = {
+      Trigger = {
+        type        = "String"
+        default     = "manual"
+        description = "Invocation source; unused by the steps"
+      }
+    }
     mainSteps = [
       {
         name      = "resolveAmi"
@@ -286,4 +297,8 @@ resource "aws_cloudwatch_event_target" "snapshot_build" {
   rule     = aws_cloudwatch_event_rule.snapshot_schedule.name
   arn      = "arn:${local.aws_partition}:ssm:${local.aws_region}:${local.aws_account_id}:automation-definition/${aws_ssm_document.snapshot_build.name}:${aws_ssm_document.snapshot_build.default_version}"
   role_arn = aws_iam_role.snapshot_events.arn
+
+  # Exactly one parameter: no input passes the whole scheduled event as
+  # parameters, and an empty map fails StartAutomationExecution validation.
+  input = jsonencode({ Trigger = ["eventbridge"] })
 }
