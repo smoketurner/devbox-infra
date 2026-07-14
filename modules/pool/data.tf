@@ -64,12 +64,15 @@ data "aws_iam_policy_document" "ami_refresh_events" {
     sid     = "StartAutomation"
     effect  = "Allow"
     actions = ["ssm:StartAutomationExecution"]
-    # SSM authorizes EventBridge's StartAutomationExecution against the
-    # unversioned document/ ARN (CloudTrail records AccessDenied on it), so the
-    # documented automation-definition form alone is not enough.
+    # SSM authorizes EventBridge's StartAutomationExecution against three
+    # resource ARNs in turn (each surfaced as a CloudTrail AccessDenied): the
+    # unversioned document/ form, the automation-execution/ run id — which
+    # cannot be scoped to the document name — and the documented
+    # automation-definition form.
     resources = [
       "arn:${local.aws_partition}:ssm:${local.aws_region}:${local.aws_account_id}:automation-definition/${aws_ssm_document.ami_refresh.name}:*",
       "arn:${local.aws_partition}:ssm:${local.aws_region}:${local.aws_account_id}:document/${aws_ssm_document.ami_refresh.name}",
+      "arn:${local.aws_partition}:ssm:${local.aws_region}:${local.aws_account_id}:automation-execution/*",
     ]
   }
 
@@ -139,10 +142,11 @@ data "aws_iam_policy_document" "snapshot_refresh_events" {
     sid     = "StartAutomation"
     effect  = "Allow"
     actions = ["ssm:StartAutomationExecution"]
-    # Both ARN forms — see ami_refresh_events.
+    # All three ARN forms — see ami_refresh_events.
     resources = [
       "arn:${local.aws_partition}:ssm:${local.aws_region}:${local.aws_account_id}:automation-definition/${aws_ssm_document.snapshot_refresh.name}:*",
       "arn:${local.aws_partition}:ssm:${local.aws_region}:${local.aws_account_id}:document/${aws_ssm_document.snapshot_refresh.name}",
+      "arn:${local.aws_partition}:ssm:${local.aws_region}:${local.aws_account_id}:automation-execution/*",
     ]
   }
 
