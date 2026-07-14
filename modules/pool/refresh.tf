@@ -17,6 +17,17 @@ resource "aws_ssm_document" "ami_refresh" {
     schemaVersion = "0.3"
     description   = "Roll unclaimed warm devbox hosts onto the latest AMI via an ASG instance refresh"
     assumeRole    = aws_iam_role.ami_refresh_automation.arn
+    # StartAutomationExecution rejects an empty parameters map, and an
+    # EventBridge target with no input passes the whole event as parameters —
+    # so the document declares one no-op parameter for the target to pass.
+    # The default keeps manual starts parameterless.
+    parameters = {
+      Trigger = {
+        type        = "String"
+        default     = "manual"
+        description = "Invocation source; unused by the steps"
+      }
+    }
     mainSteps = [{
       name   = "startInstanceRefresh"
       action = "aws:executeAwsApi"
@@ -60,10 +71,10 @@ resource "aws_cloudwatch_event_target" "ami_refresh" {
   arn      = "arn:${local.aws_partition}:ssm:${local.aws_region}:${local.aws_account_id}:automation-definition/${aws_ssm_document.ami_refresh.name}:${aws_ssm_document.ami_refresh.default_version}"
   role_arn = aws_iam_role.ami_refresh_events.arn
 
-  # Without an explicit input, EventBridge passes the whole Parameter Store
-  # Change event as the automation's parameters; the document declares none, so
-  # StartAutomationExecution rejects it and the invocation fails silently.
-  input = jsonencode({})
+  # Exactly one parameter: no input passes the whole event as parameters, and
+  # an empty map fails StartAutomationExecution validation. Values are string
+  # lists — the shape EventBridge maps onto automation parameters.
+  input = jsonencode({ Trigger = ["eventbridge"] })
 }
 
 # Workspace-snapshot rollout via launch-template re-point + ASG instance refresh
@@ -88,6 +99,14 @@ resource "aws_ssm_document" "snapshot_refresh" {
     schemaVersion = "0.3"
     description   = "Re-point the launch template at the latest workspace snapshot and roll unclaimed warm hosts"
     assumeRole    = aws_iam_role.snapshot_refresh_automation.arn
+    # No-op parameter for the EventBridge target — see ami_refresh.
+    parameters = {
+      Trigger = {
+        type        = "String"
+        default     = "manual"
+        description = "Invocation source; unused by the steps"
+      }
+    }
     mainSteps = [{
       name   = "repointAndRefresh"
       action = "aws:executeScript"
@@ -133,7 +152,6 @@ resource "aws_cloudwatch_event_target" "snapshot_refresh" {
   arn      = "arn:${local.aws_partition}:ssm:${local.aws_region}:${local.aws_account_id}:automation-definition/${aws_ssm_document.snapshot_refresh.name}:${aws_ssm_document.snapshot_refresh.default_version}"
   role_arn = aws_iam_role.snapshot_refresh_events.arn
 
-  # Same as ami_refresh: the document takes no parameters, so the default
-  # pass-the-event input would fail StartAutomationExecution.
-  input = jsonencode({})
+  # Exactly one parameter — see ami_refresh.
+  input = jsonencode({ Trigger = ["eventbridge"] })
 }
