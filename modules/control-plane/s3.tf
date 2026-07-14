@@ -10,7 +10,7 @@
 # server-side SessionDoc records (SESSION_TTL_DAYS).
 
 resource "aws_s3_bucket" "sessions" {
-  bucket = "${local.name_prefix}-sessions-${local.aws_account_id}"
+  bucket = "${local.name_prefix}-sessions-${local.aws_account_id}-${local.aws_region}"
 
   tags = local.tags
 }
