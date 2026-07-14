@@ -200,10 +200,17 @@ data "aws_iam_policy_document" "snapshot_automation" {
 # automation role (byte-for-byte the pool's ami_refresh_events pattern).
 data "aws_iam_policy_document" "snapshot_events" {
   statement {
-    sid       = "StartAutomation"
-    effect    = "Allow"
-    actions   = ["ssm:StartAutomationExecution"]
-    resources = ["arn:${local.aws_partition}:ssm:${local.aws_region}:${local.aws_account_id}:automation-definition/${aws_ssm_document.snapshot_build.name}:*"]
+    sid     = "StartAutomation"
+    effect  = "Allow"
+    actions = ["ssm:StartAutomationExecution"]
+    # SSM authorizes EventBridge's StartAutomationExecution against the
+    # unversioned document/ ARN (CloudTrail records AccessDenied on it), so the
+    # documented automation-definition form alone is not enough — the scheduled
+    # builds have been failing silently on it.
+    resources = [
+      "arn:${local.aws_partition}:ssm:${local.aws_region}:${local.aws_account_id}:automation-definition/${aws_ssm_document.snapshot_build.name}:*",
+      "arn:${local.aws_partition}:ssm:${local.aws_region}:${local.aws_account_id}:document/${aws_ssm_document.snapshot_build.name}",
+    ]
   }
 
   statement {

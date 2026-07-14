@@ -61,10 +61,16 @@ data "aws_iam_policy_document" "ami_refresh_automation" {
 # EventBridge role: start the automation and pass it the automation role.
 data "aws_iam_policy_document" "ami_refresh_events" {
   statement {
-    sid       = "StartAutomation"
-    effect    = "Allow"
-    actions   = ["ssm:StartAutomationExecution"]
-    resources = ["arn:${local.aws_partition}:ssm:${local.aws_region}:${local.aws_account_id}:automation-definition/${aws_ssm_document.ami_refresh.name}:*"]
+    sid     = "StartAutomation"
+    effect  = "Allow"
+    actions = ["ssm:StartAutomationExecution"]
+    # SSM authorizes EventBridge's StartAutomationExecution against the
+    # unversioned document/ ARN (CloudTrail records AccessDenied on it), so the
+    # documented automation-definition form alone is not enough.
+    resources = [
+      "arn:${local.aws_partition}:ssm:${local.aws_region}:${local.aws_account_id}:automation-definition/${aws_ssm_document.ami_refresh.name}:*",
+      "arn:${local.aws_partition}:ssm:${local.aws_region}:${local.aws_account_id}:document/${aws_ssm_document.ami_refresh.name}",
+    ]
   }
 
   statement {
@@ -130,10 +136,14 @@ data "aws_iam_policy_document" "snapshot_refresh_automation" {
 # Snapshot-refresh EventBridge role: start the automation and pass it its role.
 data "aws_iam_policy_document" "snapshot_refresh_events" {
   statement {
-    sid       = "StartAutomation"
-    effect    = "Allow"
-    actions   = ["ssm:StartAutomationExecution"]
-    resources = ["arn:${local.aws_partition}:ssm:${local.aws_region}:${local.aws_account_id}:automation-definition/${aws_ssm_document.snapshot_refresh.name}:*"]
+    sid     = "StartAutomation"
+    effect  = "Allow"
+    actions = ["ssm:StartAutomationExecution"]
+    # Both ARN forms — see ami_refresh_events.
+    resources = [
+      "arn:${local.aws_partition}:ssm:${local.aws_region}:${local.aws_account_id}:automation-definition/${aws_ssm_document.snapshot_refresh.name}:*",
+      "arn:${local.aws_partition}:ssm:${local.aws_region}:${local.aws_account_id}:document/${aws_ssm_document.snapshot_refresh.name}",
+    ]
   }
 
   statement {
