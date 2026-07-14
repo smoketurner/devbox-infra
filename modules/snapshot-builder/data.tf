@@ -203,13 +203,16 @@ data "aws_iam_policy_document" "snapshot_events" {
     sid     = "StartAutomation"
     effect  = "Allow"
     actions = ["ssm:StartAutomationExecution"]
-    # SSM authorizes EventBridge's StartAutomationExecution against the
-    # unversioned document/ ARN (CloudTrail records AccessDenied on it), so the
-    # documented automation-definition form alone is not enough — the scheduled
-    # builds have been failing silently on it.
+    # SSM authorizes EventBridge's StartAutomationExecution against three
+    # resource ARNs in turn (each surfaced as a CloudTrail AccessDenied): the
+    # unversioned document/ form, the automation-execution/ run id — which
+    # cannot be scoped to the document name — and the documented
+    # automation-definition form. The scheduled builds were failing silently
+    # on these denials.
     resources = [
       "arn:${local.aws_partition}:ssm:${local.aws_region}:${local.aws_account_id}:automation-definition/${aws_ssm_document.snapshot_build.name}:*",
       "arn:${local.aws_partition}:ssm:${local.aws_region}:${local.aws_account_id}:document/${aws_ssm_document.snapshot_build.name}",
+      "arn:${local.aws_partition}:ssm:${local.aws_region}:${local.aws_account_id}:automation-execution/*",
     ]
   }
 
