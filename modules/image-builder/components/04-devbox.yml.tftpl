@@ -86,8 +86,9 @@ phases:
               store-dir=/workspace/.cache/pnpm
               EOF
             # Warm-up env for devbox-warmup.service (systemd units do not read
-            # /etc/environment). Values are baked from Terraform; the App private
-            # key itself is read from SSM at warm-up, never baked.
+            # /etc/environment). Values are baked from Terraform; no secrets here —
+            # the warming fetch authenticates to devbox-server with the host's AWS
+            # identity, and the GitHub App private key stays on the control plane.
             - mkdir -p /etc/devbox
             - |
               cat > /etc/devbox/warmup.env <<'EOF'
