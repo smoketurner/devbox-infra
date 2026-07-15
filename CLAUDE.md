@@ -28,7 +28,7 @@ on `terraform apply`. Never hardcode AMI or snapshot ids; always go through thes
 
 `image-builder`, `snapshot-builder/scripts/clone-warm.sh`, and the on-box systemd units
 all call `devbox-agent` subcommands (`checkout`, `warmup`, `owner-sync`, `principals`)
-and rely on the `DEVBOX_GITHUB_*` env vars it reads. The agent binary reaches running
+and rely on the `DEVBOX_*` env vars it reads. The agent binary reaches running
 infra only through a new golden AMI. So when an infra change depends on **new** agent
 behavior:
 
@@ -38,7 +38,8 @@ behavior:
 
 Flipping infra first breaks the next build/boot (new subcommand → `command not found`;
 renamed env var → silently unauthenticated). The env vars the agent reads are defined in
-`../devbox/crates/devbox-agent/src/github_token.rs`.
+`../devbox/crates/devbox-agent/src/control_plane.rs` (`DEVBOX_SERVER_URL`) and
+`../devbox/crates/devbox-agent/src/git.rs` (`DEVBOX_GITHUB_TOKEN`).
 
 ## Conventions
 
