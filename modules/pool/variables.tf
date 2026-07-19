@@ -29,6 +29,12 @@ variable "instance_type" {
   default     = "m7g.large"
 }
 
+variable "egress_proxy_port" {
+  description = "Port of the control-plane CONNECT egress proxy the host may reach"
+  type        = number
+  default     = 3128
+}
+
 variable "min_size" {
   description = "ASG minimum size"
   type        = number

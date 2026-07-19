@@ -2,6 +2,20 @@ data "aws_caller_identity" "current" {}
 data "aws_partition" "current" {}
 data "aws_region" "current" {}
 
+# The image the service is currently running. CI owns the image (sha-pinned tags);
+# Terraform reads it here so a task-def change (adding the proxy port + egress env)
+# doesn't regress it to a stale tag, letting a single apply roll the service without
+# a CI redeploy.
+data "aws_ecs_service" "current" {
+  service_name = local.name_prefix
+  cluster_arn  = aws_ecs_cluster.this.arn
+}
+
+data "aws_ecs_container_definition" "current" {
+  task_definition = data.aws_ecs_service.current.task_definition
+  container_name  = "devbox-server"
+}
+
 # Resolves the account's OIDC issuer URL, fed to the server as DEVBOX_AGENT_OIDC_ISSUER.
 data "aws_iam_outbound_web_identity_federation" "agent_oidc" {
   depends_on = [aws_iam_outbound_web_identity_federation.agent_oidc]

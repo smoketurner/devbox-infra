@@ -30,6 +30,12 @@ module "image_builder" {
   # tokens from the control plane, authenticated by the instance's AWS identity.
   control_plane_url = "https://${var.domain_name}"
 
+  # Route box egress through the control-plane CONNECT proxy. NO_PROXY keeps the
+  # box's own AWS/SSM/IMDS calls and the control-plane host (API + git reverse
+  # proxy on 443) off the proxy.
+  egress_proxy_url = "http://${var.domain_name}:3128"
+  egress_no_proxy  = "localhost,127.0.0.1,169.254.169.254,${var.domain_name},.amazonaws.com"
+
   # The test stage exercises the real /workspace mount + warm-up against the booted
   # AMI. The snapshot param is passed by literal name (not
   # module.snapshot_builder.ssm_parameter_name) because snapshot_builder already
@@ -129,6 +135,10 @@ module "control_plane_vpc" {
   enable_ipv6                                   = true
   public_subnet_assign_ipv6_address_on_creation = true
   public_subnet_ipv6_prefixes                   = range(length(local.cp_public_subnets))
+
+  # No DNS64: there is no NAT64 here, so synthesizing 64:ff9b:: AAAA records for
+  # IPv4-only hosts (e.g. github.com) would black-hole the task's egress to them.
+  public_subnet_enable_dns64 = false
 }
 
 # Control plane: Aurora DSQL + devbox-server on ECS/Fargate. The tasks run in the
@@ -177,4 +187,8 @@ module "control_plane" {
     module.snapshot_builder.builder_instance_role_arn,
     module.image_builder.build_instance_role_arn,
   ]
+
+  # Allowlisting CONNECT egress proxy. Subdomains are matched (crates.io covers
+  # index/static.crates.io; github.com covers codeload). Tune as needs surface.
+  egress_allowlist = "crates.io,static.rust-lang.org,github.com,githubusercontent.com,registry.npmjs.org,pypi.org,files.pythonhosted.org,api.anthropic.com"
 }

@@ -44,6 +44,34 @@ resource "aws_vpc_security_group_egress_rule" "https_ipv6" {
   })
 }
 
+# Reach the control-plane CONNECT egress proxy (dual-stack: the proxy hostname
+# resolves to the dual-stack NLB, so the box may connect over either family).
+resource "aws_vpc_security_group_egress_rule" "egress_proxy" {
+  security_group_id = aws_security_group.pool.id
+  description       = "Allow outbound to the control-plane egress proxy"
+  ip_protocol       = "tcp"
+  from_port         = var.egress_proxy_port
+  to_port           = var.egress_proxy_port
+  cidr_ipv4         = "0.0.0.0/0"
+
+  tags = merge(local.tags, {
+    Name = "${local.name_prefix}-egress-proxy"
+  })
+}
+
+resource "aws_vpc_security_group_egress_rule" "egress_proxy_ipv6" {
+  security_group_id = aws_security_group.pool.id
+  description       = "Allow outbound to the control-plane egress proxy (IPv6)"
+  ip_protocol       = "tcp"
+  from_port         = var.egress_proxy_port
+  to_port           = var.egress_proxy_port
+  cidr_ipv6         = "::/0"
+
+  tags = merge(local.tags, {
+    Name = "${local.name_prefix}-egress-proxy-ipv6"
+  })
+}
+
 ################################################################################
 # Launch Template
 ################################################################################

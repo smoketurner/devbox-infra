@@ -151,6 +151,18 @@ variable "control_plane_url" {
   default     = ""
 }
 
+variable "egress_proxy_url" {
+  description = "HTTP(S)_PROXY value baked onto the box (e.g. http://host:3128). Empty leaves egress unproxied."
+  type        = string
+  default     = ""
+}
+
+variable "egress_no_proxy" {
+  description = "NO_PROXY value baked onto the box (control-plane host, IMDS, .amazonaws.com, localhost)."
+  type        = string
+  default     = ""
+}
+
 variable "docker_images" {
   description = "Container images pre-pulled into the AMI's /var/lib/docker at build time so first container use is warm. Refreshed on AMI rebuild."
   type        = list(string)

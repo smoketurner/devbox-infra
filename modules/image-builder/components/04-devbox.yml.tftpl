@@ -80,6 +80,14 @@ phases:
               DEVBOX_SERVER_URL=${control_plane_url}
               AWS_NEW_RETRIES_2026=true
               AWS_DEFAULTS_MODE=in-region
+%{ if egress_proxy_url != "" ~}
+              HTTP_PROXY=${egress_proxy_url}
+              HTTPS_PROXY=${egress_proxy_url}
+              NO_PROXY=${egress_no_proxy}
+              http_proxy=${egress_proxy_url}
+              https_proxy=${egress_proxy_url}
+              no_proxy=${egress_no_proxy}
+%{ endif ~}
               EOF
             - |
               cat > /etc/npmrc <<'EOF'
@@ -96,6 +104,14 @@ phases:
               AWS_NEW_RETRIES_2026=true
               AWS_DEFAULTS_MODE=in-region
               WARMUP_FETCH_TIMEOUT_SECS=${warmup_fetch_timeout_secs}
+%{ if egress_proxy_url != "" ~}
+              HTTP_PROXY=${egress_proxy_url}
+              HTTPS_PROXY=${egress_proxy_url}
+              NO_PROXY=${egress_no_proxy}
+              http_proxy=${egress_proxy_url}
+              https_proxy=${egress_proxy_url}
+              no_proxy=${egress_no_proxy}
+%{ endif ~}
               EOF
             - chmod 0644 /etc/devbox/warmup.env
             - systemctl daemon-reload
@@ -142,6 +158,9 @@ phases:
 
               [Service]
               Type=simple
+              # DEVBOX_SERVER_URL (for the .gitconfig reverse-proxy remotes); systemd
+              # units don't read /etc/environment, so reuse the warm-up env file.
+              EnvironmentFile=-/etc/devbox/warmup.env
               ExecStart=/usr/local/sbin/devbox-agent owner-sync
               # owner-sync exits 0 once it has provisioned the claimant's account;
               # only restart on failure so a clean exit stays stopped.

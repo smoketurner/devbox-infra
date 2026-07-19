@@ -49,6 +49,18 @@ variable "container_port" {
   default     = 3000
 }
 
+variable "egress_proxy_port" {
+  description = "Port the devbox-server's allowlisting CONNECT egress proxy listens on"
+  type        = number
+  default     = 3128
+}
+
+variable "egress_allowlist" {
+  description = "Comma-separated hostnames devboxes may reach through the egress proxy (empty disables all egress through it)"
+  type        = string
+  default     = ""
+}
+
 variable "desired_count" {
   description = "Number of Fargate tasks (the reconciler gates each tick on a TTL lock row in DSQL so only one instance acts; >1 is for API/UI availability)"
   type        = number

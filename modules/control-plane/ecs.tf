@@ -33,13 +33,19 @@ resource "aws_ecs_task_definition" "server" {
 
   container_definitions = jsonencode([{
     name      = "devbox-server"
-    image     = local.container_image
+    image     = data.aws_ecs_container_definition.current.image
     essential = true
 
-    portMappings = [{
-      containerPort = var.container_port
-      protocol      = "tcp"
-    }]
+    portMappings = [
+      {
+        containerPort = var.container_port
+        protocol      = "tcp"
+      },
+      {
+        containerPort = var.egress_proxy_port
+        protocol      = "tcp"
+      },
+    ]
 
     environment = [
       { name = "DATABASE_URL", value = local.database_url },
@@ -78,6 +84,10 @@ resource "aws_ecs_task_definition" "server" {
       { name = "DEVBOX_AGENT_AUDIENCE", value = var.agent_audience },
       { name = "DEVBOX_POOL_ROLE_ARNS", value = join(",", var.pool_role_arns) },
       { name = "DEVBOX_BUILDER_ROLE_ARNS", value = join(",", var.builder_role_arns) },
+      # Allowlisting CONNECT egress proxy (second listener). Empty allowlist denies
+      # all egress through it; unset EGRESS_PROXY_ADDR would disable the listener.
+      { name = "EGRESS_PROXY_ADDR", value = "0.0.0.0:${var.egress_proxy_port}" },
+      { name = "EGRESS_ALLOWLIST", value = var.egress_allowlist },
     ]
 
     secrets = [
@@ -126,6 +136,12 @@ resource "aws_ecs_service" "server" {
     container_port   = var.container_port
   }
 
+  load_balancer {
+    target_group_arn = aws_lb_target_group.proxy.arn
+    container_name   = "devbox-server"
+    container_port   = var.egress_proxy_port
+  }
+
   health_check_grace_period_seconds = 60
 
   deployment_minimum_healthy_percent = 50
@@ -137,13 +153,7 @@ resource "aws_ecs_service" "server" {
     rollback = true
   }
 
-  depends_on = [aws_lb_listener.tls]
-
-  # CI deploys immutable, sha-pinned task-definition revisions (see
-  # .github/workflows/deploy.yml); Terraform sets only the initial revision.
-  lifecycle {
-    ignore_changes = [task_definition]
-  }
+  depends_on = [aws_lb_listener.tls, aws_lb_listener.proxy]
 
   tags = local.tags
 }
