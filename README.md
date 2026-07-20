@@ -22,7 +22,9 @@ This repo **consumes** those build artifacts; it does not build them:
 - **`release.yml`** (on `v*` tags) publishes the `devbox-agent` binary to GitHub
   Releases (`devbox-agent-{aarch64,x86_64}-unknown-linux-musl` + `SHA256SUMS`).
   `image-builder` downloads the arm64 binary and bakes it into the golden AMI
-  (`var.devbox_agent_url`, default the `latest` release; pin with `var.devbox_agent_sha256`).
+  (`var.devbox_agent_url`, default the `latest` release — resolved to a concrete tag at
+  build time and always verified against that release's `SHA256SUMS`; a versioned
+  URL pins the release).
 - **`deploy.yml`** (on push to `main`) builds the `devbox-server` container image and
   pushes it to the ECR repo created by `control-plane`, which then rolls the ECS service.
 

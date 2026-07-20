@@ -127,15 +127,9 @@ variable "component_files" {
 }
 
 variable "devbox_agent_url" {
-  description = "URL to download the prebuilt devbox-agent binary baked into the AMI (arm64 musl static)"
+  description = "URL to download the prebuilt devbox-agent binary baked into the AMI (arm64 musl static). A releases/latest URL is resolved to its concrete release tag at build time; the binary is always verified against that release's SHA256SUMS. A versioned releases/download/<tag>/ URL pins the version."
   type        = string
   default     = "https://github.com/smoketurner/devbox/releases/latest/download/devbox-agent-aarch64-unknown-linux-musl"
-}
-
-variable "devbox_agent_sha256" {
-  description = "Optional sha256 checksum of the devbox-agent binary to pin (empty skips verification)"
-  type        = string
-  default     = ""
 }
 
 # Control-plane URL for the warming agent. Baked into the warmup service's

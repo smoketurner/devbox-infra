@@ -20,13 +20,39 @@ phases:
         inputs:
           commands:
             - echo "Downloading devbox-agent from ${agent_url}"
-            - curl -fsSL "${agent_url}" -o /usr/local/sbin/devbox-agent
+            # Resolve a releases/latest URL to its concrete release tag once
+            # (GitHub 302s releases/latest/download/<asset> to the versioned URL),
+            # then fetch both the binary and SHA256SUMS from that same tag: a
+            # release published mid-build can't silently bake a stale agent, and
+            # nothing ships unverified. A versioned URL skips resolution.
             - |
-              if [ -n "${agent_sha256}" ]; then
-                echo "${agent_sha256}  /usr/local/sbin/devbox-agent" | sha256sum -c -
-              else
-                echo "No sha256 pinned; skipping checksum verification"
+              case "${agent_url}" in
+                */releases/download/*)
+                  resolved="${agent_url}"
+                  ;;
+                *)
+                  resolved="$(curl -fsSI -o /dev/null -w '%%{redirect_url}' "${agent_url}")"
+                  ;;
+              esac
+              case "$resolved" in
+                */releases/download/*) ;;
+                *)
+                  echo "Cannot resolve ${agent_url} to a versioned release URL (redirect: $resolved)" >&2
+                  exit 1
+                  ;;
+              esac
+              base="$${resolved%/*}"
+              asset="$${resolved##*/}"
+              echo "Resolved agent release: $${base##*/}"
+              curl -fsSL "$resolved" -o /usr/local/sbin/devbox-agent
+              curl -fsSL "$base/SHA256SUMS" -o /tmp/devbox-agent.sums
+              want="$(awk -v a="$asset" '$2 == a { print $1 }' /tmp/devbox-agent.sums)"
+              if [ -z "$want" ]; then
+                echo "SHA256SUMS from $base has no entry for $asset" >&2
+                exit 1
               fi
+              echo "$want  /usr/local/sbin/devbox-agent" | sha256sum -c -
+              rm -f /tmp/devbox-agent.sums
             - chown root:root /usr/local/sbin/devbox-agent
             - chmod 0755 /usr/local/sbin/devbox-agent
             - /usr/local/sbin/devbox-agent --version

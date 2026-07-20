@@ -13,7 +13,6 @@ locals {
     for key, f in local.component_map :
     key => endswith(f, ".tftpl") ? templatefile("${path.module}/components/${f}", {
       agent_url                 = var.devbox_agent_url
-      agent_sha256              = var.devbox_agent_sha256
       control_plane_url         = var.control_plane_url
       egress_proxy_url          = var.egress_proxy_url
       egress_no_proxy           = var.egress_no_proxy

@@ -41,8 +41,11 @@ phases:
         inputs:
           commands:
             - echo "Configuring global Git settings"
+            # No system credential.helper: git accumulates helpers across scopes,
+            # so a cache here would sit in front of the box's per-invocation
+            # devbox-agent git-credential helper and keep serving its 900-second
+            # token after expiry (observed live as recurring auth failures).
             - |
-              git config --system credential.helper 'cache --timeout=3600'
               git config --system init.defaultBranch main
               git config --system core.autocrlf input
               # Snappier git for IDEs on large working trees: the fsmonitor daemon
@@ -52,6 +55,10 @@ phases:
               git config --system core.untrackedCache true
               git config --system fetch.writeCommitGraph true
               git config --system feature.manyFiles true
+            # Fail fast on git auth failures in non-interactive sessions instead
+            # of stalling on a username prompt. PAM applies /etc/environment to
+            # login/ssh sessions; the agent sets this itself for its own git runs.
+            - echo 'GIT_TERMINAL_PROMPT=0' >> /etc/environment
       - name: InstallPython314
         action: ExecuteBash
         inputs:
@@ -190,6 +197,8 @@ phases:
             - git lfs version || exit 1
             - test "$(git config --system --get core.fsmonitor)" = "true" || exit 1
             - test "$(git config --system --get core.untrackedCache)" = "true" || exit 1
+            - test -z "$(git config --system --get credential.helper)" || exit 1
+            - grep -qx 'GIT_TERMINAL_PROMPT=0' /etc/environment || exit 1
             - source /etc/profile.d/go.sh
             - source /etc/profile.d/rust.sh
             - python3.14 --version || exit 1
