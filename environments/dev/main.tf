@@ -24,6 +24,7 @@ module "image_builder" {
     "04-devbox.yml.tftpl",
     "04-ssh.yml",
     "05-docker-images.yml.tftpl",
+    "06-workspace-test.yml.tftpl",
   ]
 
   # The warming agent (and the test-stage warm-up) request repo-scoped GitHub
