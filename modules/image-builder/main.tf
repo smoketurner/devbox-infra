@@ -221,10 +221,18 @@ resource "aws_imagebuilder_lifecycle_policy" "this" {
     }
   }
 
+  # Select AMIs to garbage-collect by the stable Pipeline tag rather than by a
+  # pinned recipe semantic_version. Pinning a single recipe version meant that
+  # after any recipe bump, AMIs built from older recipe versions fell outside
+  # the selection and were never garbage-collected, leaking EBS snapshots over
+  # time (latent snapshot sprawl). The "Pipeline = ami-image-builder" tag is
+  # applied to every distributed AMI (see ami_distribution_configuration.ami_tags
+  # above, primary + cross-region), so selecting on it covers AMIs across all
+  # recipe versions while the retain-5 count and production/keep exclusions below
+  # still protect the AMIs we want to keep.
   resource_selection {
-    recipe {
-      name             = aws_imagebuilder_image_recipe.this.name
-      semantic_version = aws_imagebuilder_image_recipe.this.version
+    tag_map = {
+      Pipeline = "ami-image-builder"
     }
   }
 
