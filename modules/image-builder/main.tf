@@ -74,11 +74,15 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "components" {
   }
 }
 
-# Keys are content-addressed (components.tf), so a definition change writes a
-# NEW object and strands the previous hashed object (Terraform stops tracking
-# the old key). The module OWNS this bucket, so it reaps those superseded
-# objects here: expire the inert current objects under the components prefix and
-# the noncurrent versions left behind by same-key overwrites.
+# Keys are content-addressed (components.tf): a definition change writes a NEW
+# object at a new hashed key, so the real accumulation is NONCURRENT versions
+# left when the same key is overwritten with identical-key content. Reap only
+# those (after 7 days of recoverability) and sweep failed multipart uploads.
+# Do NOT expire current object versions: the current object at each hashed key
+# is the live component definition that aws_imagebuilder_component.this fetches
+# by uri at build time, and a blanket current-version expiration cannot tell a
+# stranded key from an in-use one, so it would delete live artifacts out from
+# under an environment that has not re-applied or rebuilt in a while.
 resource "aws_s3_bucket_lifecycle_configuration" "components" {
   bucket = aws_s3_bucket.components.id
 
@@ -90,12 +94,12 @@ resource "aws_s3_bucket_lifecycle_configuration" "components" {
       prefix = "image-builder/components/"
     }
 
-    expiration {
-      days = 30
-    }
-
     noncurrent_version_expiration {
       noncurrent_days = 7
+    }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
     }
   }
 
