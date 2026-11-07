@@ -77,4 +77,10 @@ resource "aws_imagebuilder_component" "this" {
   tags = merge(local.tags, {
     ComponentOrder = each.key
   })
+
+  # The uri is assembled from string locals, so Terraform sees no implicit edge
+  # to the object that backs it. Without this, the component could be created
+  # before its S3 object exists (a first-apply race in S3 mode). The depends_on
+  # is inert in inline mode where aws_s3_object.component plans to zero.
+  depends_on = [aws_s3_object.component]
 }
