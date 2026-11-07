@@ -24,14 +24,14 @@ resource "aws_iam_role_policy_attachment" "ssm_core" {
   policy_arn = data.aws_iam_policy.ssm_core.arn
 }
 
-# Custom inline policy: S3 access for component artifacts
+# Custom inline policy: S3 access for component artifacts. Unconditional because
+# the module now owns the component bucket and the uri path is the only delivery
+# mode; the build instance downloads each uri-referenced definition at build time.
 resource "aws_iam_role_policy" "s3_access" {
-  count = var.s3_bucket_arn != "" ? 1 : 0
-
   name = "${local.name_prefix}-s3-access"
   role = aws_iam_role.build_instance.id
 
-  policy = data.aws_iam_policy_document.s3_access[0].json
+  policy = data.aws_iam_policy_document.s3_access.json
 }
 
 # Custom inline policy: Secrets Manager access for private Git repos

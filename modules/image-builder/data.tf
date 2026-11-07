@@ -33,12 +33,10 @@ data "aws_iam_policy_document" "build_instance_assume_role" {
 }
 
 data "aws_iam_policy_document" "s3_access" {
-  count = var.s3_bucket_arn != "" ? 1 : 0
-
   statement {
     effect    = "Allow"
     actions   = ["s3:GetObject"]
-    resources = ["${var.s3_bucket_arn}/*"]
+    resources = ["${aws_s3_bucket.components.arn}/*"]
   }
 }
 

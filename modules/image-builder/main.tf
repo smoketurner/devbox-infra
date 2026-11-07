@@ -21,6 +21,89 @@ resource "aws_kms_alias" "ami" {
 }
 
 ################################################################################
+# Component Artifact Bucket
+################################################################################
+
+# Module-owned bucket backing the S3 component-definition path (components.tf).
+# aws_imagebuilder_component takes EITHER inline `data` (hard-capped at 16000
+# chars after rendering) OR a `uri` pointing at an S3 object; referencing by uri
+# is now the only path, so the module provisions its own bucket rather than
+# requiring a caller-supplied one. Name follows the repo's state-bucket
+# precedent <purpose>-<account_id>-<region>; interpolated (not hardcoded) and
+# lowercase/DNS-compatible as S3 requires.
+resource "aws_s3_bucket" "components" {
+  bucket = "${local.name_prefix}-components-${local.aws_account_id}-${local.aws_region}"
+
+  tags = merge(local.tags, {
+    Name = "${local.name_prefix}-components"
+  })
+}
+
+# Versioning is on so a content-addressed overwrite (same key, new render) keeps
+# the prior object version recoverable; the lifecycle rule below reaps old
+# versions so they do not accumulate.
+resource "aws_s3_bucket_versioning" "components" {
+  bucket = aws_s3_bucket.components.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+# Component definitions are internal build artifacts: never public.
+resource "aws_s3_bucket_public_access_block" "components" {
+  bucket = aws_s3_bucket.components.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# SSE-KMS at rest reusing the module's AMI CMK (the build instance role already
+# holds Encrypt/Decrypt on it). bucket_key_enabled cuts KMS request cost.
+resource "aws_s3_bucket_server_side_encryption_configuration" "components" {
+  bucket = aws_s3_bucket.components.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = aws_kms_key.ami.arn
+    }
+    bucket_key_enabled = true
+  }
+}
+
+# Keys are content-addressed (components.tf), so a definition change writes a
+# NEW object and strands the previous hashed object (Terraform stops tracking
+# the old key). The module OWNS this bucket, so it reaps those superseded
+# objects here: expire the inert current objects under the components prefix and
+# the noncurrent versions left behind by same-key overwrites.
+resource "aws_s3_bucket_lifecycle_configuration" "components" {
+  bucket = aws_s3_bucket.components.id
+
+  rule {
+    id     = "expire-stale-components"
+    status = "Enabled"
+
+    filter {
+      prefix = "image-builder/components/"
+    }
+
+    expiration {
+      days = 30
+    }
+
+    noncurrent_version_expiration {
+      noncurrent_days = 7
+    }
+  }
+
+  # Lifecycle rules act on versions, so wire the explicit dependency.
+  depends_on = [aws_s3_bucket_versioning.components]
+}
+
+################################################################################
 # Image Recipe
 ################################################################################
 
