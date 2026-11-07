@@ -119,6 +119,14 @@ variable "s3_components_enabled" {
   description = "When true AND s3_bucket_arn is set, upload rendered component definitions to S3 and reference them by uri instead of inline data, to bypass the 16000-char inline cap. Defaults false so the inline data path is used unchanged."
   type        = bool
   default     = false
+
+  # Enabling the feature without a bucket would silently fall back to the inline
+  # path (and its 16000-char cap) the operator was trying to escape. Fail loudly
+  # instead. Cross-variable validation requires Terraform >= 1.9.
+  validation {
+    condition     = !var.s3_components_enabled || var.s3_bucket_arn != ""
+    error_message = "s3_components_enabled requires a non-empty s3_bucket_arn; the module does not provision a bucket."
+  }
 }
 
 variable "secrets_arns" {
