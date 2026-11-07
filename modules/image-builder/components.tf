@@ -24,15 +24,55 @@ locals {
       test_workspace_mount_script = file("${path.module}/components/scripts/test-workspace-mount.sh")
     }) : file("${path.module}/components/${f}")
   }
+
+  # Opt-in S3-backed component path. aws_imagebuilder_component accepts EITHER
+  # inline `data` (hard-capped at 16000 chars after rendering) OR a `uri` that
+  # points at an S3 object; they are mutually exclusive. When enabled we upload
+  # each rendered definition to S3 and reference it by uri, letting the largest
+  # components exceed the inline cap. Stays dormant unless BOTH the flag is set
+  # and a bucket arn is provided (the module does not provision a bucket).
+  s3_components_active = var.s3_components_enabled && var.s3_bucket_arn != ""
+
+  # Bucket name is the last ':' segment of arn:aws:s3:::bucket-name. Only used
+  # when the S3 path is active.
+  s3_components_bucket = local.s3_components_active ? element(split(":", var.s3_bucket_arn), length(split(":", var.s3_bucket_arn)) - 1) : ""
+
+  # Stable S3 key per component. Embedding the content hash makes new rendered
+  # content a new object, mirroring the inline name-hash self-replacement below.
+  component_s3_keys = {
+    for key, content in local.component_data :
+    key => "image-builder/components/${local.name_prefix}-${key}-${substr(sha256(content), 0, 8)}.yml"
+  }
+}
+
+# Uploaded only when the S3 path is active; for_each resolves to an empty map
+# otherwise so no objects are planned by default (inline path untouched).
+resource "aws_s3_object" "component" {
+  for_each = local.s3_components_active ? local.component_data : {}
+
+  bucket       = local.s3_components_bucket
+  key          = local.component_s3_keys[each.key]
+  content      = each.value
+  content_type = "application/x-yaml"
+
+  tags = merge(local.tags, {
+    ComponentOrder = each.key
+  })
 }
 
 resource "aws_imagebuilder_component" "this" {
   for_each = local.component_data
 
+  # Keep the content-hash suffix in BOTH modes so a content change forces a new
+  # component (self-replacement), regardless of inline vs S3 delivery.
   name     = "${local.name_prefix}-${each.key}-${substr(sha256(each.value), 0, 8)}"
   platform = "Linux"
   version  = "1.0.0"
-  data     = each.value
+
+  # Exactly one of data/uri is non-null. Default = inline data; when the S3 path
+  # is active, reference the uploaded object instead.
+  data = local.s3_components_active ? null : each.value
+  uri  = local.s3_components_active ? "s3://${local.s3_components_bucket}/${local.component_s3_keys[each.key]}" : null
 
   tags = merge(local.tags, {
     ComponentOrder = each.key

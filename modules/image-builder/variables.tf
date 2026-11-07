@@ -115,6 +115,12 @@ variable "s3_bucket_arn" {
   default     = ""
 }
 
+variable "s3_components_enabled" {
+  description = "When true AND s3_bucket_arn is set, upload rendered component definitions to S3 and reference them by uri instead of inline data, to bypass the 16000-char inline cap. Defaults false so the inline data path is used unchanged."
+  type        = bool
+  default     = false
+}
+
 variable "secrets_arns" {
   description = "Secrets Manager ARNs for private Git repository access tokens"
   type        = list(string)
