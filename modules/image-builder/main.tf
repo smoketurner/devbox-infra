@@ -188,6 +188,14 @@ resource "aws_imagebuilder_image_pipeline" "this" {
     timeout_minutes     = var.image_tests_timeout_minutes
   }
 
+  # Enable Amazon Inspector vulnerability scanning on images produced by this
+  # pipeline. These are EC2 AMIs (not container images), so no ecr_configuration
+  # is set. Scanning is service-managed; account-level Amazon Inspector EC2
+  # scanning must be enabled out-of-band for findings to be generated.
+  image_scanning_configuration {
+    image_scanning_enabled = true
+  }
+
   tags = local.tags
 }
 
