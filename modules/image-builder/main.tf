@@ -28,11 +28,18 @@ resource "aws_kms_alias" "ami" {
 # aws_imagebuilder_component takes EITHER inline `data` (hard-capped at 16000
 # chars after rendering) OR a `uri` pointing at an S3 object; referencing by uri
 # is now the only path, so the module provisions its own bucket rather than
-# requiring a caller-supplied one. Name follows the repo's state-bucket
-# precedent <purpose>-<account_id>-<region>; interpolated (not hardcoded) and
+# requiring a caller-supplied one. This is an S3 account regional namespace
+# general-purpose bucket (bucket_namespace = "account-regional"), so its name
+# is suffixed with "-an" and is scoped to this account and region: only this
+# AWS account can ever create a bucket in its own account-regional namespace,
+# so the name can never be squatted by another account. It stays a
+# general-purpose bucket, so every companion resource below (versioning, public
+# access block, SSE, lifecycle) and the Image Builder uri=s3://bucket/key read
+# path are unaffected. Name is interpolated (not hardcoded) and
 # lowercase/DNS-compatible as S3 requires.
 resource "aws_s3_bucket" "components" {
-  bucket = "${local.name_prefix}-components-${local.aws_account_id}-${local.aws_region}"
+  bucket           = "${local.name_prefix}-components-${local.aws_account_id}-${local.aws_region}-an"
+  bucket_namespace = "account-regional"
 
   tags = merge(local.tags, {
     Name = "${local.name_prefix}-components"
