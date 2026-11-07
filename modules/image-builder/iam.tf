@@ -108,3 +108,28 @@ resource "aws_iam_role_policy" "lifecycle" {
 
   policy = data.aws_iam_policy_document.lifecycle.json
 }
+
+# Release-Rebuild Invoke Role (opt-in)
+#
+# EventBridge assumes this role to start the image pipeline when the custom
+# devbox-agent release event arrives (see notifications.tf). Count-gated on
+# release_rebuild_trigger_enabled so a bootstrap apply creates nothing by default.
+# The inline policy grants only StartImagePipelineExecution on this one pipeline.
+
+resource "aws_iam_role" "release_rebuild" {
+  count = var.release_rebuild_trigger_enabled ? 1 : 0
+
+  name               = "${local.name_prefix}-release-rebuild-events"
+  assume_role_policy = data.aws_iam_policy_document.events_assume_role[0].json
+
+  tags = local.tags
+}
+
+resource "aws_iam_role_policy" "release_rebuild" {
+  count = var.release_rebuild_trigger_enabled ? 1 : 0
+
+  name = "${local.name_prefix}-release-rebuild"
+  role = aws_iam_role.release_rebuild[0].id
+
+  policy = data.aws_iam_policy_document.release_rebuild[0].json
+}
