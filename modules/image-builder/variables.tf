@@ -116,7 +116,7 @@ variable "s3_bucket_arn" {
 }
 
 variable "s3_components_enabled" {
-  description = "When true AND s3_bucket_arn is set, upload rendered component definitions to S3 and reference them by uri instead of inline data, to bypass the 16000-char inline cap. Defaults false so the inline data path is used unchanged."
+  description = "When true AND s3_bucket_arn is set, upload rendered component definitions to S3 and reference them by uri instead of inline data, to bypass the 16000-char inline cap. Defaults false so the inline data path is used unchanged. Keys are content-addressed, so definition changes leave superseded objects behind; add an S3 lifecycle expiration rule on the 'image-builder/components/' prefix of the caller-owned bucket to reap them."
   type        = bool
   default     = false
 

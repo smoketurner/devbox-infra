@@ -39,6 +39,15 @@ locals {
 
   # Stable S3 key per component. Embedding the content hash makes new rendered
   # content a new object, mirroring the inline name-hash self-replacement below.
+  #
+  # CLEANUP EXPECTATION: because the key is content-addressed, a definition
+  # change writes a NEW object and leaves the previous hashed object in place
+  # (Terraform no longer tracks the old key). These superseded objects are inert
+  # but accumulate. The module does not own the caller-supplied bucket, so it
+  # deliberately does not manage its lifecycle config here (that would risk
+  # clobbering the caller's existing rules). Operators enabling S3 mode should
+  # add an S3 lifecycle expiration rule on the "image-builder/components/" prefix
+  # to reap stale definitions.
   component_s3_keys = {
     for key, content in local.component_data :
     key => "image-builder/components/${local.name_prefix}-${key}-${substr(sha256(content), 0, 8)}.yml"
