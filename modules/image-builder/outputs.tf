@@ -42,3 +42,13 @@ output "kms_key_arn" {
   description = "ARN of the KMS key used for AMI encryption"
   value       = aws_kms_key.ami.arn
 }
+
+output "components_bucket_name" {
+  description = "Name of the module-owned S3 bucket holding component definitions"
+  value       = aws_s3_bucket.components.id
+}
+
+output "components_bucket_arn" {
+  description = "ARN of the module-owned S3 bucket holding component definitions"
+  value       = aws_s3_bucket.components.arn
+}

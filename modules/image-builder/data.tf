@@ -33,12 +33,10 @@ data "aws_iam_policy_document" "build_instance_assume_role" {
 }
 
 data "aws_iam_policy_document" "s3_access" {
-  count = var.s3_bucket_arn != "" ? 1 : 0
-
   statement {
     effect    = "Allow"
     actions   = ["s3:GetObject"]
-    resources = ["${var.s3_bucket_arn}/*"]
+    resources = ["${aws_s3_bucket.components.arn}/*"]
   }
 }
 
@@ -116,6 +114,37 @@ data "aws_iam_policy_document" "sns_topic_policy" {
 
     actions   = ["sns:Publish"]
     resources = [aws_sns_topic.pipeline.arn]
+  }
+}
+
+# Assume-role policy for the release-rebuild invoke role. EventBridge (the events
+# service) assumes this role to call StartImagePipelineExecution on the pipeline
+# target. Distinct from imagebuilder_assume_role above, which is for the
+# imagebuilder service principal, not the events service.
+data "aws_iam_policy_document" "events_assume_role" {
+  count = var.release_rebuild_trigger_enabled ? 1 : 0
+
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["events.${local.aws_dns_suffix}"]
+    }
+  }
+}
+
+# Inline permissions for the release-rebuild invoke role: start exactly this
+# pipeline when EventBridge delivers the custom devbox-agent release event.
+data "aws_iam_policy_document" "release_rebuild" {
+  count = var.release_rebuild_trigger_enabled ? 1 : 0
+
+  statement {
+    sid       = "StartImagePipeline"
+    effect    = "Allow"
+    actions   = ["imagebuilder:StartImagePipelineExecution"]
+    resources = [aws_imagebuilder_image_pipeline.this.arn]
   }
 }
 

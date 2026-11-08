@@ -24,14 +24,14 @@ resource "aws_iam_role_policy_attachment" "ssm_core" {
   policy_arn = data.aws_iam_policy.ssm_core.arn
 }
 
-# Custom inline policy: S3 access for component artifacts
+# Custom inline policy: S3 access for component artifacts. Unconditional because
+# the module now owns the component bucket and the uri path is the only delivery
+# mode; the build instance downloads each uri-referenced definition at build time.
 resource "aws_iam_role_policy" "s3_access" {
-  count = var.s3_bucket_arn != "" ? 1 : 0
-
   name = "${local.name_prefix}-s3-access"
   role = aws_iam_role.build_instance.id
 
-  policy = data.aws_iam_policy_document.s3_access[0].json
+  policy = data.aws_iam_policy_document.s3_access.json
 }
 
 # Custom inline policy: Secrets Manager access for private Git repos
@@ -107,4 +107,29 @@ resource "aws_iam_role_policy" "lifecycle" {
   role = aws_iam_role.lifecycle.id
 
   policy = data.aws_iam_policy_document.lifecycle.json
+}
+
+# Release-Rebuild Invoke Role (opt-in)
+#
+# EventBridge assumes this role to start the image pipeline when the custom
+# devbox-agent release event arrives (see notifications.tf). Count-gated on
+# release_rebuild_trigger_enabled so a bootstrap apply creates nothing by default.
+# The inline policy grants only StartImagePipelineExecution on this one pipeline.
+
+resource "aws_iam_role" "release_rebuild" {
+  count = var.release_rebuild_trigger_enabled ? 1 : 0
+
+  name               = "${local.name_prefix}-release-rebuild-events"
+  assume_role_policy = data.aws_iam_policy_document.events_assume_role[0].json
+
+  tags = local.tags
+}
+
+resource "aws_iam_role_policy" "release_rebuild" {
+  count = var.release_rebuild_trigger_enabled ? 1 : 0
+
+  name = "${local.name_prefix}-release-rebuild"
+  role = aws_iam_role.release_rebuild[0].id
+
+  policy = data.aws_iam_policy_document.release_rebuild[0].json
 }

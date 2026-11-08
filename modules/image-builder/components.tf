@@ -24,17 +24,54 @@ locals {
       test_workspace_mount_script = file("${path.module}/components/scripts/test-workspace-mount.sh")
     }) : file("${path.module}/components/${f}")
   }
+
+  # Stable S3 key per component. Embedding the content hash makes new rendered
+  # content a new object, mirroring the component name-hash self-replacement
+  # below. Because the key is content-addressed, a definition change writes a
+  # NEW object and strands the previous hashed one; the module now OWNS the
+  # bucket (aws_s3_bucket.components in main.tf) and reaps those superseded
+  # objects via the lifecycle rule there, so no caller cleanup is expected.
+  component_s3_keys = {
+    for key, content in local.component_data :
+    key => "image-builder/components/${local.name_prefix}-${key}-${substr(sha256(content), 0, 8)}.yml"
+  }
+}
+
+# Upload every rendered component definition to the module-owned bucket.
+# aws_imagebuilder_component references these by uri (below), which bypasses the
+# 16000-char inline `data` cap that the largest components exceed.
+resource "aws_s3_object" "component" {
+  for_each = local.component_data
+
+  bucket       = aws_s3_bucket.components.id
+  key          = local.component_s3_keys[each.key]
+  content      = each.value
+  content_type = "application/x-yaml"
+
+  tags = merge(local.tags, {
+    ComponentOrder = each.key
+  })
 }
 
 resource "aws_imagebuilder_component" "this" {
   for_each = local.component_data
 
+  # Keep the content-hash suffix in the name so a content change forces a new
+  # component (self-replacement).
   name     = "${local.name_prefix}-${each.key}-${substr(sha256(each.value), 0, 8)}"
   platform = "Linux"
   version  = "1.0.0"
-  data     = each.value
+
+  # uri is the only delivery path: reference the uploaded S3 object. (data and
+  # uri are mutually exclusive; data stays null.)
+  uri = "s3://${aws_s3_bucket.components.id}/${local.component_s3_keys[each.key]}"
 
   tags = merge(local.tags, {
     ComponentOrder = each.key
   })
+
+  # The uri is assembled from string locals, so Terraform sees no implicit edge
+  # to the object that backs it. Without this, the component could be created
+  # before its S3 object exists (a first-apply race).
+  depends_on = [aws_s3_object.component]
 }

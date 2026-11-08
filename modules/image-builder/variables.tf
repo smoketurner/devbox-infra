@@ -109,12 +109,6 @@ variable "notification_emails" {
   default     = []
 }
 
-variable "s3_bucket_arn" {
-  description = "S3 bucket ARN for component artifacts and build manifests"
-  type        = string
-  default     = ""
-}
-
 variable "secrets_arns" {
   description = "Secrets Manager ARNs for private Git repository access tokens"
   type        = list(string)
@@ -182,6 +176,19 @@ variable "warmup_fetch_timeout_secs" {
   description = "Optional override for the agent's overall fetch budget (WARMUP_FETCH_TIMEOUT_SECS). Empty uses the agent default (120s)."
   type        = string
   default     = ""
+}
+
+# Release-triggered rebuild. When enabled, creates an EventBridge rule plus an
+# IAM role EventBridge can assume to start this pipeline. GitHub releases are not a
+# native EventBridge source, so this is opt-in: it only fires when the devbox-agent
+# repo's release workflow makes an out-of-band `aws events put-events` call
+# (source=devbox.releases, detail-type="devbox-agent release published") on the
+# default bus. Defaults OFF so a first bootstrap apply creates no trigger resources
+# and stays clean until that out-of-band wiring exists.
+variable "release_rebuild_trigger_enabled" {
+  description = "Create an opt-in EventBridge rule + IAM role so a devbox-agent GitHub release can start this image pipeline. Requires an out-of-band `aws events put-events` call from the agent repo's release workflow (source=devbox.releases, detail-type=\"devbox-agent release published\"); defaults OFF so a bootstrap apply stays clean."
+  type        = bool
+  default     = false
 }
 
 variable "tags" {

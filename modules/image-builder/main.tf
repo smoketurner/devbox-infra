@@ -21,6 +21,100 @@ resource "aws_kms_alias" "ami" {
 }
 
 ################################################################################
+# Component Artifact Bucket
+################################################################################
+
+# Module-owned bucket backing the S3 component-definition path (components.tf).
+# aws_imagebuilder_component takes EITHER inline `data` (hard-capped at 16000
+# chars after rendering) OR a `uri` pointing at an S3 object; referencing by uri
+# is now the only path, so the module provisions its own bucket rather than
+# requiring a caller-supplied one. This is an S3 account regional namespace
+# general-purpose bucket (bucket_namespace = "account-regional"), so its name
+# is suffixed with "-an" and is scoped to this account and region: only this
+# AWS account can ever create a bucket in its own account-regional namespace,
+# so the name can never be squatted by another account. It stays a
+# general-purpose bucket, so every companion resource below (versioning, public
+# access block, SSE, lifecycle) and the Image Builder uri=s3://bucket/key read
+# path are unaffected. Name is interpolated (not hardcoded) and
+# lowercase/DNS-compatible as S3 requires.
+resource "aws_s3_bucket" "components" {
+  bucket           = "${local.name_prefix}-components-${local.aws_account_id}-${local.aws_region}-an"
+  bucket_namespace = "account-regional"
+
+  tags = merge(local.tags, {
+    Name = "${local.name_prefix}-components"
+  })
+}
+
+# Versioning is on so a content-addressed overwrite (same key, new render) keeps
+# the prior object version recoverable; the lifecycle rule below reaps old
+# versions so they do not accumulate.
+resource "aws_s3_bucket_versioning" "components" {
+  bucket = aws_s3_bucket.components.id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+# Component definitions are internal build artifacts: never public.
+resource "aws_s3_bucket_public_access_block" "components" {
+  bucket = aws_s3_bucket.components.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# SSE-KMS at rest reusing the module's AMI CMK (the build instance role already
+# holds Encrypt/Decrypt on it). bucket_key_enabled cuts KMS request cost.
+resource "aws_s3_bucket_server_side_encryption_configuration" "components" {
+  bucket = aws_s3_bucket.components.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm     = "aws:kms"
+      kms_master_key_id = aws_kms_key.ami.arn
+    }
+    bucket_key_enabled = true
+  }
+}
+
+# Keys are content-addressed (components.tf): a definition change writes a NEW
+# object at a new hashed key, so the real accumulation is NONCURRENT versions
+# left when the same key is overwritten with identical-key content. Reap only
+# those (after 7 days of recoverability) and sweep failed multipart uploads.
+# Do NOT expire current object versions: the current object at each hashed key
+# is the live component definition that aws_imagebuilder_component.this fetches
+# by uri at build time, and a blanket current-version expiration cannot tell a
+# stranded key from an in-use one, so it would delete live artifacts out from
+# under an environment that has not re-applied or rebuilt in a while.
+resource "aws_s3_bucket_lifecycle_configuration" "components" {
+  bucket = aws_s3_bucket.components.id
+
+  rule {
+    id     = "expire-stale-components"
+    status = "Enabled"
+
+    filter {
+      prefix = "image-builder/components/"
+    }
+
+    noncurrent_version_expiration {
+      noncurrent_days = 7
+    }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+  }
+
+  # Lifecycle rules act on versions, so wire the explicit dependency.
+  depends_on = [aws_s3_bucket_versioning.components]
+}
+
+################################################################################
 # Image Recipe
 ################################################################################
 
@@ -188,6 +282,14 @@ resource "aws_imagebuilder_image_pipeline" "this" {
     timeout_minutes     = var.image_tests_timeout_minutes
   }
 
+  # Enable Amazon Inspector vulnerability scanning on images produced by this
+  # pipeline. These are EC2 AMIs (not container images), so no ecr_configuration
+  # is set. Scanning is service-managed; account-level Amazon Inspector EC2
+  # scanning must be enabled out-of-band for findings to be generated.
+  image_scanning_configuration {
+    image_scanning_enabled = true
+  }
+
   tags = local.tags
 }
 
@@ -221,10 +323,18 @@ resource "aws_imagebuilder_lifecycle_policy" "this" {
     }
   }
 
+  # Select AMIs to garbage-collect by the stable Pipeline tag rather than by a
+  # pinned recipe semantic_version. Pinning a single recipe version meant that
+  # after any recipe bump, AMIs built from older recipe versions fell outside
+  # the selection and were never garbage-collected, leaking EBS snapshots over
+  # time (latent snapshot sprawl). The "Pipeline = ami-image-builder" tag is
+  # applied to every distributed AMI (see ami_distribution_configuration.ami_tags
+  # above, primary + cross-region), so selecting on it covers AMIs across all
+  # recipe versions while the retain-5 count and production/keep exclusions below
+  # still protect the AMIs we want to keep.
   resource_selection {
-    recipe {
-      name             = aws_imagebuilder_image_recipe.this.name
-      semantic_version = aws_imagebuilder_image_recipe.this.version
+    tag_map = {
+      Pipeline = "ami-image-builder"
     }
   }
 
