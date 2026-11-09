@@ -18,57 +18,133 @@ resource "aws_security_group" "pool" {
 # (the agent connects to sshd on loopback), so no security group ingress is
 # needed. Instances have no public IP and there is no bastion.
 
-resource "aws_vpc_security_group_egress_rule" "https" {
-  security_group_id = aws_security_group.pool.id
-  description       = "Allow outbound HTTPS traffic"
-  ip_protocol       = "tcp"
-  from_port         = 443
-  to_port           = 443
-  cidr_ipv4         = "0.0.0.0/0"
+# Egress posture: a pool box has NO direct route to arbitrary third-party hosts
+# (api.anthropic.com, crates.io, pypi.org, ...). The ONLY path to those is THROUGH
+# the control-plane CONNECT egress proxy. The rules below permit exactly the direct
+# traffic NO_PROXY requires — AWS service endpoints and the control-plane host —
+# and nothing else. The former broad tcp/443 -> 0.0.0.0/0 (+ ::/0) and
+# tcp/<proxy> -> 0.0.0.0/0 (+ ::/0) rules are intentionally gone.
+
+# AWS services via the workload VPC's interface endpoints: the SSM tunnel
+# (ssm/ssmmessages/ec2messages), the agent's STS/web-identity calls (sts), ECR
+# image pulls (ecr.api/ecr.dkr + the S3 gateway endpoint), and ec2:CreateTags
+# self-tagging (ec2). private_dns_enabled on those endpoints makes the box's
+# NO_PROXY `.amazonaws.com` DNS resolve to the private endpoint IPs, so this stays
+# on the AWS private network instead of transiting fck-nat to 0.0.0.0/0.
+#
+# A referenced_security_group_id egress rule is family-agnostic: it covers BOTH
+# IPv4 and IPv6 traffic to the endpoints' ENIs, so no separate _ipv6 sibling is
+# required here.
+resource "aws_vpc_security_group_egress_rule" "aws_endpoints" {
+  security_group_id            = aws_security_group.pool.id
+  description                  = "Allow outbound HTTPS to the VPC interface endpoints (SSM tunnel, STS/web-identity, ECR, ec2)"
+  ip_protocol                  = "tcp"
+  from_port                    = 443
+  to_port                      = 443
+  referenced_security_group_id = var.endpoints_security_group_id
 
   tags = merge(local.tags, {
-    Name = "${local.name_prefix}-egress-https"
+    Name = "${local.name_prefix}-egress-aws-endpoints"
   })
 }
 
-resource "aws_vpc_security_group_egress_rule" "https_ipv6" {
+# Control-plane host direct 443 per NO_PROXY: the API + git reverse proxy. Scoped
+# to the control-plane NLB static EIP (in a separate VPC, reached over the public
+# internet), not 0.0.0.0/0.
+resource "aws_vpc_security_group_egress_rule" "control_plane_https" {
   security_group_id = aws_security_group.pool.id
-  description       = "Allow outbound HTTPS traffic (IPv6)"
+  description       = "Allow outbound HTTPS to the control-plane host (API + git reverse proxy)"
   ip_protocol       = "tcp"
   from_port         = 443
   to_port           = 443
-  cidr_ipv6         = "::/0"
+  cidr_ipv4         = var.control_plane_cidr
 
   tags = merge(local.tags, {
-    Name = "${local.name_prefix}-egress-https-ipv6"
+    Name = "${local.name_prefix}-egress-control-plane"
   })
 }
 
-# Reach the control-plane CONNECT egress proxy (dual-stack: the proxy hostname
-# resolves to the dual-stack NLB, so the box may connect over either family).
+# Dual-stack sibling, created only when a stable control-plane IPv6 CIDR is
+# supplied. The NLB's IPv6 node address is auto-assigned and not exported as a
+# stable value, so control_plane_ipv6_cidr defaults to "" and this rule is
+# absent by default.
+resource "aws_vpc_security_group_egress_rule" "control_plane_https_ipv6" {
+  count = var.control_plane_ipv6_cidr != "" ? 1 : 0
+
+  security_group_id = aws_security_group.pool.id
+  description       = "Allow outbound HTTPS to the control-plane host (API + git reverse proxy, IPv6)"
+  ip_protocol       = "tcp"
+  from_port         = 443
+  to_port           = 443
+  cidr_ipv6         = var.control_plane_ipv6_cidr
+
+  tags = merge(local.tags, {
+    Name = "${local.name_prefix}-egress-control-plane-ipv6"
+  })
+}
+
+# Reach the control-plane CONNECT egress proxy — the only route to arbitrary
+# third-party hosts. Tightened from 0.0.0.0/0 to the same control-plane NLB CIDR
+# the proxy hostname resolves to.
 resource "aws_vpc_security_group_egress_rule" "egress_proxy" {
   security_group_id = aws_security_group.pool.id
   description       = "Allow outbound to the control-plane egress proxy"
   ip_protocol       = "tcp"
   from_port         = var.egress_proxy_port
   to_port           = var.egress_proxy_port
-  cidr_ipv4         = "0.0.0.0/0"
+  cidr_ipv4         = var.control_plane_cidr
 
   tags = merge(local.tags, {
     Name = "${local.name_prefix}-egress-proxy"
   })
 }
 
+# Dual-stack sibling for the proxy port, created only when a control-plane IPv6
+# CIDR is supplied (see control_plane_https_ipv6 for why it defaults off).
 resource "aws_vpc_security_group_egress_rule" "egress_proxy_ipv6" {
+  count = var.control_plane_ipv6_cidr != "" ? 1 : 0
+
   security_group_id = aws_security_group.pool.id
   description       = "Allow outbound to the control-plane egress proxy (IPv6)"
   ip_protocol       = "tcp"
   from_port         = var.egress_proxy_port
   to_port           = var.egress_proxy_port
-  cidr_ipv6         = "::/0"
+  cidr_ipv6         = var.control_plane_ipv6_cidr
 
   tags = merge(local.tags, {
     Name = "${local.name_prefix}-egress-proxy-ipv6"
+  })
+}
+
+# Operator escape hatch: additional direct-egress /32s without a code change.
+# Default empty => no rules => locked-down default posture.
+resource "aws_vpc_security_group_egress_rule" "extra_direct" {
+  for_each = toset(var.extra_direct_egress_cidrs)
+
+  security_group_id = aws_security_group.pool.id
+  description       = "Operator-allowed direct HTTPS egress"
+  ip_protocol       = "tcp"
+  from_port         = 443
+  to_port           = 443
+  cidr_ipv4         = each.value
+
+  tags = merge(local.tags, {
+    Name = "${local.name_prefix}-egress-extra-${replace(each.value, "/[./:]/", "-")}"
+  })
+}
+
+resource "aws_vpc_security_group_egress_rule" "extra_direct_ipv6" {
+  for_each = toset(var.extra_direct_egress_ipv6_cidrs)
+
+  security_group_id = aws_security_group.pool.id
+  description       = "Operator-allowed direct HTTPS egress (IPv6)"
+  ip_protocol       = "tcp"
+  from_port         = 443
+  to_port           = 443
+  cidr_ipv6         = each.value
+
+  tags = merge(local.tags, {
+    Name = "${local.name_prefix}-egress-extra-ipv6-${replace(each.value, "/[./:]/", "-")}"
   })
 }
 

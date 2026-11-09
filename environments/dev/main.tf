@@ -9,6 +9,24 @@ module "vpc" {
   public_subnets  = local.public_subnets
 }
 
+# Interface VPC endpoints (+ S3 gateway) in the workload VPC. private_dns_enabled
+# makes the box's NO_PROXY `.amazonaws.com` calls resolve to private endpoint IPs,
+# so the pool SG can scope its 443 egress to these endpoints' SG instead of
+# allowing 0.0.0.0/0 through fck-nat.
+module "vpc_endpoints" {
+  source = "../../modules/vpc-endpoints"
+
+  name_prefix = "devbox-${local.environment}"
+
+  vpc_id                  = module.vpc.vpc_id
+  vpc_cidr_block          = module.vpc.vpc_cidr_block
+  vpc_ipv6_cidr_block     = module.vpc.vpc_ipv6_cidr_block
+  subnet_ids              = module.vpc.private_subnets
+  private_route_table_ids = module.vpc.private_route_table_ids
+
+  tags = local.common_tags
+}
+
 module "image_builder" {
   source = "../../modules/image-builder"
 
@@ -89,6 +107,17 @@ module "pool" {
   vpc_id             = module.vpc.vpc_id
   subnet_ids         = module.vpc.private_subnets
   security_group_ids = []
+
+  # Lock down box egress. AWS services go to the VPC interface endpoints; the
+  # control-plane host (API + git proxy on 443 and the CONNECT proxy port) is
+  # reached directly at the NLB's static EIP, known at plan time. Everything
+  # else must transit the CONNECT egress proxy.
+  endpoints_security_group_id = module.vpc_endpoints.endpoints_security_group_id
+  control_plane_cidr          = "${module.control_plane.nlb_eip}/32"
+  # control_plane_ipv6_cidr left at its default (empty) => no IPv6 direct-to-
+  # control-plane rules. The NLB's IPv6 node address is auto-assigned and not
+  # exported as a stable value, so there is nothing stable to scope an IPv6 rule
+  # to; IPv6 third-party egress still works through the proxy.
 
   instance_type = "t4g.small"
 
