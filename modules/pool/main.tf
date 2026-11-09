@@ -64,10 +64,13 @@ resource "aws_vpc_security_group_egress_rule" "control_plane_https" {
   })
 }
 
-# Dual-stack sibling, created only when a stable control-plane IPv6 CIDR is
-# supplied. The NLB's IPv6 node address is auto-assigned and not exported as a
-# stable value, so control_plane_ipv6_cidr defaults to "" and this rule is
-# absent by default.
+# Dual-stack sibling: REQUIRED whenever the box can resolve the control-plane
+# hostname to an AAAA record. The control-plane hostname publishes both an A and
+# an AAAA alias to the dual-stack NLB, and pool subnets are dual-stack, so an
+# IPv6-preferring box (RFC 6724) reaches the API/git host over IPv6; without
+# this rule that path is black-holed. control_plane_ipv6_cidr is the control-
+# plane NLB's IPv6 scope (its public subnet's /64, a stable plan-time value). The
+# count gate keeps the module usable in an IPv4-only topology (empty default).
 resource "aws_vpc_security_group_egress_rule" "control_plane_https_ipv6" {
   count = var.control_plane_ipv6_cidr != "" ? 1 : 0
 

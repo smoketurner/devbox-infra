@@ -46,7 +46,7 @@ variable "control_plane_cidr" {
 }
 
 variable "control_plane_ipv6_cidr" {
-  description = "IPv6 CIDR for the control-plane host, for dual-stack parity. Empty (the default) means no IPv6 direct-to-control-plane rules are created (the NLB's IPv6 node address is auto-assigned and not exported as a stable value)."
+  description = "IPv6 CIDR the pool box reaches directly for the control-plane host (API/git on 443 and the proxy port). MUST be supplied whenever the control-plane hostname resolves to an AAAA record and pool subnets are dual-stack, or IPv6-preferring boxes (RFC 6724) black-hole on the proxy/API path. Scope it to the control-plane NLB's IPv6 (e.g. its public subnet's /64). Empty (the default) disables the IPv6 direct-to-control-plane rules for IPv4-only topologies."
   type        = string
   default     = ""
 }

@@ -114,10 +114,20 @@ module "pool" {
   # else must transit the CONNECT egress proxy.
   endpoints_security_group_id = module.vpc_endpoints.endpoints_security_group_id
   control_plane_cidr          = "${module.control_plane.nlb_eip}/32"
-  # control_plane_ipv6_cidr left at its default (empty) => no IPv6 direct-to-
-  # control-plane rules. The NLB's IPv6 node address is auto-assigned and not
-  # exported as a stable value, so there is nothing stable to scope an IPv6 rule
-  # to; IPv6 third-party egress still works through the proxy.
+  # The control-plane hostname publishes BOTH an A and an AAAA alias to the
+  # dual-stack NLB (modules/control-plane/dns.tf). Pool subnets are dual-stack
+  # (IPv6 + DNS64 + egress-only IGW), so a box resolving the proxy/API host
+  # (http://${var.domain_name}:3128, https://${var.domain_name}) prefers the AAAA
+  # answer per RFC 6724 and connects over IPv6. We therefore MUST keep an IPv6
+  # egress path to the control plane, or that connection is black-holed.
+  #
+  # The NLB's IPv6 *node* address is auto-assigned and not exported, but the NLB
+  # lives in the control-plane VPC's single dual-stack public subnet, whose IPv6
+  # /64 IS a stable, plan-time value. Scope the pool SG's IPv6 control-plane rules
+  # to that /64 (the EIP's IPv4 /32 handles the A path). This turns the pool
+  # module's count-gated IPv6 siblings ON by default, restoring the IPv6 egress
+  # the old ::/0 rules provided, without a 0.0.0.0/0-equivalent.
+  control_plane_ipv6_cidr = module.control_plane_vpc.public_subnets_ipv6_cidr_blocks[0]
 
   instance_type = "t4g.small"
 
