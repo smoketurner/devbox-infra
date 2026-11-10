@@ -34,7 +34,7 @@ mkdir -p "$root/workspace" "$root/etc/devbox/harnesses"
 
 # Fail the build now, not at a sub-agent's first boot, if the guest can't run
 # what the init needs.
-for tool in git tmux socat script node; do
+for tool in git tmux script node; do
   chroot "$root" /usr/bin/env "$tool" --version >/dev/null 2>&1 ||
     chroot "$root" /usr/bin/env "$tool" -V >/dev/null 2>&1 || {
     echo "guest is missing a working $tool" >&2
