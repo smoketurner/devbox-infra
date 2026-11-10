@@ -86,6 +86,12 @@ resource "aws_launch_template" "pool" {
     arn = aws_iam_instance_profile.host.arn
   }
 
+  # Nitro Sandboxes are created through the Nitro Enclaves driver, which EC2
+  # exposes (/dev/nitro_enclaves) only on instances launched with this option.
+  enclave_options {
+    enabled = var.nitro_sandboxes_enabled
+  }
+
   metadata_options {
     http_endpoint               = "enabled"
     http_tokens                 = "required"
@@ -149,6 +155,13 @@ resource "aws_launch_template" "pool" {
   }
 
   tags = local.tags
+
+  lifecycle {
+    precondition {
+      condition     = !var.nitro_sandboxes_enabled || !(startswith(var.instance_type, "t") || endswith(var.instance_type, ".medium"))
+      error_message = "nitro_sandboxes_enabled requires an enclave-capable instance type; T-family and .medium sizes do not support Nitro Enclaves/Sandboxes."
+    }
+  }
 }
 
 ################################################################################
