@@ -90,8 +90,11 @@ so a claimant can run sub-agents in [Nitro Sandboxes](https://docs.aws.amazon.co
 enclave-capable instance type (not T-family or `.medium`; a plan-time precondition
 enforces this) and an AMI with the `07-nitro-sandboxes` component, whose allocator
 reserves half the host's vCPUs and a quarter of its memory for the sandbox pool
-(override in `/etc/devbox/nitro-sandbox.env`). The AMI prepares only the parent side;
-the sandbox launcher and guest image are tracked in `smoketurner/devbox`.
+(override in `/etc/devbox/nitro-sandbox.env`). It also installs
+`devbox-sandboxd.service`, the root daemon (`devbox-agent sandboxd`) that jails and
+runs sandbox VMMs for the claimant's `devbox-agent sandbox` commands. Like the
+allocator, it only starts on hosts that have `/dev/nitro_enclaves`. Firecracker,
+`jailer` and the guest image are not baked yet (tracked in `smoketurner/devbox`).
 
 ### `control-plane` — orchestration
 

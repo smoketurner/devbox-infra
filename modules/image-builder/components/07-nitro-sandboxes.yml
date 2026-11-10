@@ -11,9 +11,13 @@ schemaVersion: 1.0
 #   - a drop-in gating the allocator on /dev/nitro_enclaves, so the same AMI boots
 #     cleanly on hosts launched without enclave options (the default) and on the
 #     Image Builder build/test instances.
-# The guest VMM (Firecracker with sandbox support) and guest image are not baked
-# here: AWS documents no package or release for a sandbox-capable build yet, and
-# the launcher belongs to devbox-agent (agent-contract ordering gate).
+#   - devbox-sandboxd.service: the root daemon (`devbox-agent sandboxd`) that
+#     jails and runs sandbox VMMs and their vsock relays for the claimant's
+#     `devbox-agent sandbox` commands, gated on /dev/nitro_enclaves like the
+#     allocator. Needs an agent release with `sandboxd` (ordering gate).
+# The guest VMM (Firecracker with sandbox support), jailer and guest image are
+# not baked here yet: AWS documents no package or release for a sandbox-capable
+# build.
 phases:
   - name: build
     steps:
@@ -69,6 +73,41 @@ phases:
               EOF
             - systemctl daemon-reload
             - systemctl enable nitro-enclaves-allocator.service
+      - name: InstallSandboxDaemon
+        action: ExecuteBash
+        inputs:
+          commands:
+            - |
+              cat > /etc/systemd/system/devbox-sandboxd.service <<'EOF'
+              [Unit]
+              Description=devbox sub-agent sandbox daemon (jails and runs Nitro Sandbox VMMs)
+              Documentation=https://github.com/smoketurner/devbox/tree/main/crates/devbox-agent#sandbox--sub-agents-in-nitro-sandboxes
+              # Only enclave-enabled launches (pool nitro_sandboxes_enabled) can run
+              # sandboxes; elsewhere the unit is skipped, not failed.
+              ConditionPathExists=/dev/nitro_enclaves
+              After=network-online.target workspace.mount nitro-enclaves-allocator.service
+              Wants=network-online.target
+
+              [Service]
+              ExecStart=/usr/local/sbin/devbox-agent sandboxd
+              # The egress proxy (HTTPS_PROXY) and control plane (DEVBOX_SERVER_URL)
+              # the relays forward guest traffic to.
+              EnvironmentFile=-/etc/environment
+              EnvironmentFile=-/etc/devbox/warmup.env
+              # /run/devbox/sandboxd.sock
+              RuntimeDirectory=devbox
+              RuntimeDirectoryPreserve=yes
+              # VMMs run in their own process groups; a daemon restart must not
+              # kill running sandboxes (the daemon finds them again on start).
+              KillMode=process
+              Restart=on-failure
+              RestartSec=2
+
+              [Install]
+              WantedBy=multi-user.target
+              EOF
+            - systemctl daemon-reload
+            - systemctl enable devbox-sandboxd.service
   - name: validate
     steps:
       - name: ValidateNitroSandboxes
@@ -80,6 +119,8 @@ phases:
             - bash -n /usr/local/sbin/devbox-nitro-sandbox-size || exit 1
             - grep -q "ConditionPathExists=/dev/nitro_enclaves" /etc/systemd/system/nitro-enclaves-allocator.service.d/10-devbox.conf || exit 1
             - systemctl is-enabled nitro-enclaves-allocator.service || exit 1
+            - systemd-analyze verify /etc/systemd/system/devbox-sandboxd.service || exit 1
+            - systemctl is-enabled devbox-sandboxd.service || exit 1
   - name: test
     steps:
       - name: TestNitroSandboxes
@@ -96,10 +137,14 @@ phases:
               if [ -e /dev/nitro_enclaves ]; then
                 systemctl is-active nitro-enclaves-allocator.service || exit 1
                 test -s /etc/nitro_enclaves/allocator.yaml || exit 1
+                systemctl is-active devbox-sandboxd.service || exit 1
+                test -S /run/devbox/sandboxd.sock || exit 1
               else
-                if systemctl is-failed --quiet nitro-enclaves-allocator.service; then
-                  echo "allocator failed on a host without /dev/nitro_enclaves"
-                  exit 1
-                fi
+                for unit in nitro-enclaves-allocator.service devbox-sandboxd.service; do
+                  if systemctl is-failed --quiet "$unit"; then
+                    echo "$unit failed on a host without /dev/nitro_enclaves"
+                    exit 1
+                  fi
+                done
               fi
             - echo "Nitro Sandbox host prep verified on boot"
