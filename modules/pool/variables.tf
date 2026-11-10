@@ -35,6 +35,34 @@ variable "egress_proxy_port" {
   default     = 3128
 }
 
+variable "endpoints_security_group_id" {
+  description = "Security group ID of the VPC interface endpoints the pool nodes reach on 443 for AWS services (SSM tunnel, agent STS/web-identity, ECR, ec2:CreateTags). Required."
+  type        = string
+}
+
+variable "control_plane_cidr" {
+  description = "IPv4 CIDR the pool box reaches directly on 443 per NO_PROXY (the control-plane NLB static EIP, e.g. \"<eip>/32\"). Covers both the API + git reverse proxy on 443 and the CONNECT egress proxy port."
+  type        = string
+}
+
+variable "control_plane_ipv6_cidr" {
+  description = "IPv6 CIDR the pool box reaches directly for the control-plane host (API/git on 443 and the proxy port). MUST be supplied whenever the control-plane hostname resolves to an AAAA record and pool subnets are dual-stack, or IPv6-preferring boxes (RFC 6724) black-hole on the proxy/API path. Scope it to the control-plane NLB's IPv6 (e.g. its public subnet's /64). Empty (the default) disables the IPv6 direct-to-control-plane rules for IPv4-only topologies."
+  type        = string
+  default     = ""
+}
+
+variable "extra_direct_egress_cidrs" {
+  description = "Operator escape hatch: additional IPv4 /32s the pool box may reach directly on 443 without a code change. Empty (the default) keeps the locked-down posture."
+  type        = list(string)
+  default     = []
+}
+
+variable "extra_direct_egress_ipv6_cidrs" {
+  description = "Operator escape hatch: additional IPv6 CIDRs the pool box may reach directly on 443 without a code change. Empty (the default) keeps the locked-down posture."
+  type        = list(string)
+  default     = []
+}
+
 variable "min_size" {
   description = "ASG minimum size"
   type        = number
