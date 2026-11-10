@@ -3,7 +3,7 @@ description: Build the Nitro Sandbox guest root filesystem and, when configured,
 schemaVersion: 1.0
 # The guest half of devbox sub-agent sandboxes (smoketurner/devbox#164):
 #   - /opt/devbox/sandbox/rootfs.ext4: an Amazon Linux 2023 root (dnf
-#     --installroot) with git, tmux, Node and the harness CLIs, the same
+#     --installroot) with git, Node and the harness CLIs, the same
 #     devbox-agent as the host, and devbox-guest.service (`devbox-agent guest`).
 #     Built by scripts/build-sandbox-guest.sh, injected verbatim by components.tf.
 #   - Optionally Firecracker, jailer and the guest kernel, downloaded with

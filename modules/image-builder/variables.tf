@@ -198,11 +198,11 @@ variable "tags" {
 }
 
 variable "sandbox_guest_packages" {
-  description = "Amazon Linux 2023 packages installed into the Nitro Sandbox guest root filesystem (08-sandbox-guest). The guest init needs systemd, util-linux (script, mount), git and tmux (it speaks vsock itself); Node runs the npm harness CLIs."
+  description = "Amazon Linux 2023 packages installed into the Nitro Sandbox guest root filesystem (08-sandbox-guest). The guest init needs systemd, util-linux (mount) and git (it speaks vsock itself); Node runs the npm harness CLIs."
   type        = list(string)
   default = [
     "systemd", "util-linux", "bash", "coreutils", "findutils", "procps-ng", "shadow-utils",
-    "ca-certificates", "git", "tmux", "nodejs22", "nodejs22-npm", "python3",
+    "ca-certificates", "git", "nodejs22", "nodejs22-npm", "python3",
     "tar", "gzip", "which", "glibc-langpack-en",
   ]
 }
