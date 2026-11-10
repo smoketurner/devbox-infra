@@ -196,3 +196,33 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "sandbox_guest_packages" {
+  description = "Amazon Linux 2023 packages installed into the Nitro Sandbox guest root filesystem (08-sandbox-guest). The guest init needs systemd, util-linux (script, mount), git, tmux and socat; Node runs the npm harness CLIs."
+  type        = list(string)
+  default = [
+    "systemd", "util-linux", "bash", "coreutils", "findutils", "procps-ng", "shadow-utils",
+    "ca-certificates", "git", "tmux", "socat", "nodejs22", "nodejs22-npm", "python3",
+    "tar", "gzip", "which", "glibc-langpack-en",
+  ]
+}
+
+variable "sandbox_guest_npm_packages" {
+  description = "npm packages installed globally in the sandbox guest: the harness CLIs `devbox-agent guest` launches (claude, codex). Pin versions (e.g. @openai/codex@0.50.0) for reproducible AMIs."
+  type        = list(string)
+  default     = ["@anthropic-ai/claude-code", "@openai/codex"]
+}
+
+variable "sandbox_artifacts" {
+  description = "Sandbox binaries to bake, by name -> sha256: firecracker and jailer (installed in /usr/local/bin) and vmlinux (/opt/devbox/sandbox/vmlinux). Upload each to the components bucket at sandbox-artifacts/<name> first; the build downloads it with S3Download and verifies the checksum. Empty: nothing is baked and the sandbox daemon's preflight reports what is missing."
+  type        = map(string)
+  default     = {}
+
+  validation {
+    condition = alltrue([
+      for name, sha in var.sandbox_artifacts :
+      contains(["firecracker", "jailer", "vmlinux"], name) && can(regex("^[0-9a-f]{64}$", sha))
+    ])
+    error_message = "sandbox_artifacts keys must be firecracker, jailer or vmlinux, each mapped to a lowercase hex sha256."
+  }
+}

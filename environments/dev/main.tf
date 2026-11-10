@@ -44,6 +44,7 @@ module "image_builder" {
     "05-docker-images.yml.tftpl",
     "06-workspace-test.yml.tftpl",
     "07-nitro-sandboxes.yml.tftpl",
+    "08-sandbox-guest.yml.tftpl",
   ]
 
   # Pin a concrete release asset instead of tracking the mutable releases/latest
