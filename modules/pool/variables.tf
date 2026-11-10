@@ -29,6 +29,12 @@ variable "instance_type" {
   default     = "m7g.large"
 }
 
+variable "nitro_sandboxes_enabled" {
+  description = "Launch pool hosts with Nitro Enclaves enabled so claimants can run sub-agents in Nitro Sandboxes (hardware-isolated child VMs, no nested virtualization). Requires an enclave-capable instance type — not T-family or .medium sizes — and an AMI built with the 07-nitro-sandboxes component. The AMI's allocator reserves part of each host's vCPUs and memory for the sandbox pool, so size instance_type up (e.g. m7g.2xlarge) when enabling."
+  type        = bool
+  default     = false
+}
+
 variable "egress_proxy_port" {
   description = "Port of the control-plane CONNECT egress proxy the host may reach"
   type        = number

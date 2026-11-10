@@ -84,6 +84,15 @@ An Auto Scaling Group whose launch template resolves the golden AMI
 `/workspace`. Instances run the baked agent (warmup → `devbox:ready=true`). The control
 plane sets desired capacity.
 
+`nitro_sandboxes_enabled` (default `false`) launches hosts with Nitro Enclaves enabled
+so a claimant can run sub-agents in [Nitro Sandboxes](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/amazon-ec2-nitro-sandboxes.html)
+— hardware-isolated child VMs next to the host, no nested virtualization. It needs an
+enclave-capable instance type (not T-family or `.medium`; a plan-time precondition
+enforces this) and an AMI with the `07-nitro-sandboxes` component, whose allocator
+reserves half the host's vCPUs and a quarter of its memory for the sandbox pool
+(override in `/etc/devbox/nitro-sandbox.env`). The AMI prepares only the parent side;
+the sandbox launcher and guest image are tracked in `smoketurner/devbox`.
+
 ### `control-plane` — orchestration
 
 An ECS Fargate service running `devbox-server` from ECR, behind an NLB with TLS. Handles

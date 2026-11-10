@@ -37,3 +37,8 @@ output "ami_refresh_document_name" {
   description = "Name of the SSM Automation document that rolls the pool onto a new AMI"
   value       = aws_ssm_document.ami_refresh.name
 }
+
+output "nitro_sandboxes_enabled" {
+  description = "Whether pool hosts launch with Nitro Enclaves enabled for Nitro Sandboxes"
+  value       = var.nitro_sandboxes_enabled
+}

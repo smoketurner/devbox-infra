@@ -43,6 +43,7 @@ module "image_builder" {
     "04-ssh.yml",
     "05-docker-images.yml.tftpl",
     "06-workspace-test.yml.tftpl",
+    "07-nitro-sandboxes.yml",
   ]
 
   # Pin a concrete release asset instead of tracking the mutable releases/latest
@@ -130,6 +131,11 @@ module "pool" {
   control_plane_ipv6_cidr = module.control_plane_vpc.public_subnets_ipv6_cidr_blocks[0]
 
   instance_type = "t4g.small"
+
+  # Nitro Sandboxes for sub-agents stay off in dev: t4g.small can't enable Nitro
+  # Enclaves. Flip together with an enclave-capable size (e.g. m7g.2xlarge) once
+  # the AMI carries 07-nitro-sandboxes.
+  nitro_sandboxes_enabled = false
 
   # Root volume must be >= the AMI's root snapshot, which is 100GB to hold the
   # pre-pulled Docker images (see image_builder recipe volume_size).
