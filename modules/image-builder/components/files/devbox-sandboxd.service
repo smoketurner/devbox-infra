@@ -1,0 +1,26 @@
+[Unit]
+Description=devbox sub-agent sandbox daemon (jails and runs Nitro Sandbox VMMs)
+Documentation=https://github.com/smoketurner/devbox/tree/main/crates/devbox-agent#sandbox--sub-agents-in-nitro-sandboxes
+# Only enclave-enabled launches (pool nitro_sandboxes_enabled) can run
+# sandboxes; elsewhere the unit is skipped, not failed.
+ConditionPathExists=/dev/nitro_enclaves
+After=network-online.target workspace.mount nitro-enclaves-allocator.service
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/local/sbin/devbox-agent sandboxd
+# The egress proxy (HTTPS_PROXY) and control plane (DEVBOX_SERVER_URL)
+# the relays forward guest traffic to.
+EnvironmentFile=-/etc/environment
+EnvironmentFile=-/etc/devbox/warmup.env
+# /run/devbox/sandboxd.sock
+RuntimeDirectory=devbox
+RuntimeDirectoryPreserve=yes
+# VMMs run in their own process groups; a daemon restart must not
+# kill running sandboxes (the daemon finds them again on start).
+KillMode=process
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

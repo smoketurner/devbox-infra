@@ -43,7 +43,7 @@ module "image_builder" {
     "04-ssh.yml",
     "05-docker-images.yml.tftpl",
     "06-workspace-test.yml.tftpl",
-    "07-nitro-sandboxes.yml",
+    "07-nitro-sandboxes.yml.tftpl",
   ]
 
   # Pin a concrete release asset instead of tracking the mutable releases/latest

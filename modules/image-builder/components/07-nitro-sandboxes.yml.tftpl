@@ -15,6 +15,9 @@ schemaVersion: 1.0
 #     jails and runs sandbox VMMs and their vsock relays for the claimant's
 #     `devbox-agent sandbox` commands, gated on /dev/nitro_enclaves like the
 #     allocator. Needs an agent release with `sandboxd` (ordering gate).
+# The script and units are real files, injected verbatim by components.tf so
+# they can be linted and diffed on their own: scripts/devbox-nitro-sandbox-size.sh,
+# files/nitro-enclaves-allocator-devbox.conf, files/devbox-sandboxd.service.
 # The guest VMM (Firecracker with sandbox support), jailer and guest image are
 # not baked here yet: AWS documents no package or release for a sandbox-capable
 # build.
@@ -32,44 +35,13 @@ phases:
           commands:
             - |
               cat > /usr/local/sbin/devbox-nitro-sandbox-size <<'EOF'
-              #!/bin/bash
-              # Size the Nitro Enclaves allocator pool for Nitro Sandboxes from this
-              # host's resources. Sandbox memory is never overcommitted and pinned
-              # vCPUs come out of this pool, so whatever is reserved here is taken
-              # from the claimant's own session. Defaults: half the vCPUs (at least
-              # 1, as AWS requires on a 2-vCPU Graviton host) and a quarter of RAM.
-              # Override via /etc/devbox/nitro-sandbox.env:
-              #   DEVBOX_SANDBOX_CPU_PERCENT, DEVBOX_SANDBOX_MEMORY_PERCENT
-              set -euo pipefail
-              if [ -r /etc/devbox/nitro-sandbox.env ]; then
-                # shellcheck disable=SC1091
-                . /etc/devbox/nitro-sandbox.env
-              fi
-              cpu_percent="${DEVBOX_SANDBOX_CPU_PERCENT:-50}"
-              mem_percent="${DEVBOX_SANDBOX_MEMORY_PERCENT:-25}"
-              vcpus="$(nproc --all)"
-              mem_mib="$(awk '/^MemTotal:/ { print int($2 / 1024) }' /proc/meminfo)"
-              cpu_count=$((vcpus * cpu_percent / 100))
-              if [ "$cpu_count" -lt 1 ]; then cpu_count=1; fi
-              if [ "$cpu_count" -ge "$vcpus" ]; then cpu_count=$((vcpus - 1)); fi
-              memory_mib=$((mem_mib * mem_percent / 100))
-              if [ "$memory_mib" -lt 512 ]; then memory_mib=512; fi
-              install -d -m 0755 /etc/nitro_enclaves
-              printf -- '---\nmemory_mib: %s\ncpu_count: %s\n' "$memory_mib" "$cpu_count" \
-                >/etc/nitro_enclaves/allocator.yaml
-              echo "nitro sandbox pool: cpu_count=${cpu_count}/${vcpus} memory_mib=${memory_mib}/${mem_mib}"
+              ${indent(14, trimspace(nitro_sandbox_size_script))}
               EOF
             - chmod 0755 /usr/local/sbin/devbox-nitro-sandbox-size
             - mkdir -p /etc/systemd/system/nitro-enclaves-allocator.service.d
             - |
               cat > /etc/systemd/system/nitro-enclaves-allocator.service.d/10-devbox.conf <<'EOF'
-              [Unit]
-              # Only enclave-enabled launches (pool nitro_sandboxes_enabled) expose
-              # the device; elsewhere the unit is skipped, not failed.
-              ConditionPathExists=/dev/nitro_enclaves
-
-              [Service]
-              ExecStartPre=/usr/local/sbin/devbox-nitro-sandbox-size
+              ${indent(14, trimspace(nitro_allocator_dropin))}
               EOF
             - systemctl daemon-reload
             - systemctl enable nitro-enclaves-allocator.service
@@ -79,32 +51,7 @@ phases:
           commands:
             - |
               cat > /etc/systemd/system/devbox-sandboxd.service <<'EOF'
-              [Unit]
-              Description=devbox sub-agent sandbox daemon (jails and runs Nitro Sandbox VMMs)
-              Documentation=https://github.com/smoketurner/devbox/tree/main/crates/devbox-agent#sandbox--sub-agents-in-nitro-sandboxes
-              # Only enclave-enabled launches (pool nitro_sandboxes_enabled) can run
-              # sandboxes; elsewhere the unit is skipped, not failed.
-              ConditionPathExists=/dev/nitro_enclaves
-              After=network-online.target workspace.mount nitro-enclaves-allocator.service
-              Wants=network-online.target
-
-              [Service]
-              ExecStart=/usr/local/sbin/devbox-agent sandboxd
-              # The egress proxy (HTTPS_PROXY) and control plane (DEVBOX_SERVER_URL)
-              # the relays forward guest traffic to.
-              EnvironmentFile=-/etc/environment
-              EnvironmentFile=-/etc/devbox/warmup.env
-              # /run/devbox/sandboxd.sock
-              RuntimeDirectory=devbox
-              RuntimeDirectoryPreserve=yes
-              # VMMs run in their own process groups; a daemon restart must not
-              # kill running sandboxes (the daemon finds them again on start).
-              KillMode=process
-              Restart=on-failure
-              RestartSec=2
-
-              [Install]
-              WantedBy=multi-user.target
+              ${indent(14, trimspace(sandboxd_unit))}
               EOF
             - systemctl daemon-reload
             - systemctl enable devbox-sandboxd.service
