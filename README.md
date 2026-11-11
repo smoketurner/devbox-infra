@@ -88,27 +88,32 @@ plane sets desired capacity.
 so a claimant can run sub-agents in [Nitro Sandboxes](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/amazon-ec2-nitro-sandboxes.html)
 — hardware-isolated child VMs next to the host, no nested virtualization. It needs an
 enclave-capable instance type (not T-family or `.medium`; a plan-time precondition
-enforces this) and an AMI with the `07-nitro-sandboxes` component, whose allocator
-reserves half the host's vCPUs and a quarter of its memory for the sandbox pool
-(override in `/etc/devbox/nitro-sandbox.env`). It also installs
-`devbox-sandboxd.service`, the root daemon (`devbox-agent sandboxd`) that jails and
-runs sandbox VMMs for the claimant's `devbox-agent sandbox` commands. Like the
-allocator, it only starts on hosts that have `/dev/nitro_enclaves`.
+enforces this) and an AMI with the `07-nitro-sandboxes` and `08-sandbox-guest`
+components.
 
-The `08-sandbox-guest` component builds the guest those VMMs boot:
+`07-nitro-sandboxes` prepares the host:
+- `01-base` upgrades the AMI to the latest `kernel6.18`, and `07` fails the build
+  unless it is at least 6.18.51-120.162, the first release with Nitro Sandbox
+  support. The Nitro Enclaves driver is built into that kernel.
+- It reserves `sandbox_memory_percent` (default 25) of RAM for sandboxes with the
+  `nitro_enclaves.mempool` kernel argument. The driver finds sandbox vCPUs
+  itself, so there is no allocator service or CPU pool.
+- It installs `devbox-sandboxd.service`, the root daemon (`devbox-agent sandboxd`)
+  that jails and runs sandbox VMMs for the claimant's `devbox-agent sandbox`
+  commands. It only starts on hosts that have `/dev/nitro_enclaves`.
+
+`08-sandbox-guest` installs the VMM and builds the guest it boots:
+- `firecracker` and `jailer` from the upstream Firecracker release
+  (`firecracker_version`, default 1.18.0), checked against `firecracker_sha256`;
+- `/opt/devbox/sandbox/vmlinuz`, the kernel the AMI boots (AWS boots the guest on
+  the parent's own kernel);
+- `/opt/devbox/sandbox/initrd.img`, a dracut initramfs for that kernel that loads
+  the virtio-PCI, block, ext4, overlay, vsock and NSM modules before the root
+  drive mounts;
 - `/opt/devbox/sandbox/rootfs.ext4`, an Amazon Linux 2023 root built with
-  `dnf --installroot` (`sandbox_guest_packages`);
-- the harness CLIs from npm (`sandbox_guest_npm_packages`; pin versions for
-  reproducible AMIs);
-- the host's own `devbox-agent`;
-- `devbox-guest.service`, which runs `devbox-agent guest`.
-
-Firecracker, `jailer` and the guest kernel are baked only when you supply them.
-AWS publishes no sandbox-capable build we can point at yet. Upload each to the
-components bucket at `sandbox-artifacts/<name>` (`firecracker`, `jailer`,
-`vmlinux`) and list it with its sha256 in `sandbox_artifacts`. The build fetches
-it with `S3Download` and refuses a checksum mismatch. Until then, the sandbox
-daemon's preflight names what is missing.
+  `dnf --installroot` (`sandbox_guest_packages`), with the harness CLIs from npm
+  (`sandbox_guest_npm_packages`; pin versions for reproducible AMIs), the host's
+  own `devbox-agent`, and `devbox-guest.service`, which runs `devbox-agent guest`.
 
 ### `control-plane` — orchestration
 

@@ -10,7 +10,9 @@ phases:
           commands:
             - echo "Applying base OS updates"
             - dnf update -y --security
-            - dnf update -y kernel || true
+            # The base AMI is the kernel-6.18 line (data.tf); take its latest
+            # release. 07-nitro-sandboxes checks the version Nitro Sandboxes need.
+            - dnf upgrade -y kernel6.18
       - name: InstallAdditionalPackages
         action: ExecuteBash
         inputs:

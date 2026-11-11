@@ -1,8 +1,15 @@
 #!/bin/bash
-# Build the Nitro Sandbox guest root filesystem, /opt/devbox/sandbox/rootfs.ext4,
-# from Amazon Linux 2023 packages on this build instance. The guest boots it
-# read-only (systemd.volatile=overlay gives it a writable tmpfs layer) and runs
-# `devbox-agent guest` from devbox-guest.service.
+# Build the Nitro Sandbox guest image under /opt/devbox/sandbox on this build
+# instance:
+#   vmlinuz      the kernel this AMI boots (AWS boots the guest on the parent's
+#                own AL2023 kernel, an EFI-stub image)
+#   initrd.img   a dracut initramfs for that kernel. kernel6.18 builds the
+#                drivers the guest needs as modules, so the initramfs loads them
+#                before the root drive mounts. Its systemd module runs
+#                systemd-volatile-root for systemd.volatile=overlay.
+#   rootfs.ext4  an Amazon Linux 2023 root from dnf packages. The guest boots it
+#                read-only (systemd.volatile=overlay gives it a writable tmpfs
+#                layer) and runs `devbox-agent guest` from devbox-guest.service.
 #
 # Inputs (environment):
 #   GUEST_PACKAGES      dnf packages for the guest, space-separated
@@ -11,6 +18,20 @@
 set -euo pipefail
 
 out_dir=/opt/devbox/sandbox
+# Drivers the guest needs before its root drive mounts: virtio-PCI for every
+# device, virtio-blk + ext4 for the root and workspace drives, overlay for the
+# volatile root, the vsock transport for the host relay, and nsm. Forced, so
+# they load even when the initramfs's udev doesn't ask for them.
+guest_drivers="virtio_pci virtio_blk ext4 overlay vmw_vsock_virtio_transport nsm"
+
+kernel="$(grubby --default-kernel)"
+kver="${kernel#/boot/vmlinuz-}"
+install -d -m 0755 "$out_dir"
+install -m 0644 "$kernel" "$out_dir/vmlinuz"
+dracut --force --no-hostonly --no-hostonly-cmdline --reproducible \
+  --force-drivers "$guest_drivers" --kver "$kver" "$out_dir/initrd.img"
+echo "sandbox guest kernel: $kver"
+
 root="$(mktemp -d /var/tmp/sandbox-guest.XXXXXX)"
 trap 'rm -rf "$root"' EXIT
 
@@ -43,7 +64,6 @@ for tool in git node; do
 done
 
 size_mib="$(($(du -sm "$root" | cut -f1) + 512))"
-install -d -m 0755 "$out_dir"
 mkfs.ext4 -q -F -L sbroot -d "$root" "$out_dir/rootfs.ext4.tmp" "${size_mib}M"
 mv "$out_dir/rootfs.ext4.tmp" "$out_dir/rootfs.ext4"
 echo "sandbox guest rootfs: $out_dir/rootfs.ext4 (${size_mib} MiB)"

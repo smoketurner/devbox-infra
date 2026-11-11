@@ -213,16 +213,35 @@ variable "sandbox_guest_npm_packages" {
   default     = ["@anthropic-ai/claude-code", "@openai/codex"]
 }
 
-variable "sandbox_artifacts" {
-  description = "Sandbox binaries to bake, by name -> sha256: firecracker and jailer (installed in /usr/local/bin) and vmlinux (/opt/devbox/sandbox/vmlinux). Upload each to the components bucket at sandbox-artifacts/<name> first; the build downloads it with S3Download and verifies the checksum. Empty: nothing is baked and the sandbox daemon's preflight reports what is missing."
-  type        = map(string)
-  default     = {}
+variable "firecracker_version" {
+  description = "Upstream Firecracker release baked for Nitro Sandboxes (1.18.0 or later supports them). The aarch64 release tarball is downloaded from GitHub and checked against firecracker_sha256; it provides both firecracker and jailer."
+  type        = string
+  default     = "1.18.0"
 
   validation {
-    condition = alltrue([
-      for name, sha in var.sandbox_artifacts :
-      contains(["firecracker", "jailer", "vmlinux"], name) && can(regex("^[0-9a-f]{64}$", sha))
-    ])
-    error_message = "sandbox_artifacts keys must be firecracker, jailer or vmlinux, each mapped to a lowercase hex sha256."
+    condition     = can(regex("^[0-9]+\\.[0-9]+\\.[0-9]+$", var.firecracker_version))
+    error_message = "firecracker_version must be a release version like 1.18.0 (no leading v)."
+  }
+}
+
+variable "firecracker_sha256" {
+  description = "sha256 of firecracker-v<firecracker_version>-aarch64.tgz, as published next to it in the release (.sha256.txt). Change it together with firecracker_version."
+  type        = string
+  default     = "2a6130ff0338901ff9d7fbd73ce046c6b1c6123889dc84a34d678aa53bd0c0c2"
+
+  validation {
+    condition     = can(regex("^[0-9a-f]{64}$", var.firecracker_sha256))
+    error_message = "firecracker_sha256 must be a lowercase hex sha256."
+  }
+}
+
+variable "sandbox_memory_percent" {
+  description = "Share of each pool host's RAM reserved for Nitro Sandboxes, set at boot with the nitro_enclaves.mempool kernel argument. It is a percentage so one AMI fits every instance size. The reservation is a CMA area: until sandboxes use it, the kernel lends it to movable allocations such as ordinary process memory."
+  type        = number
+  default     = 25
+
+  validation {
+    condition     = var.sandbox_memory_percent >= 1 && var.sandbox_memory_percent <= 90 && floor(var.sandbox_memory_percent) == var.sandbox_memory_percent
+    error_message = "sandbox_memory_percent must be a whole number from 1 to 90."
   }
 }
