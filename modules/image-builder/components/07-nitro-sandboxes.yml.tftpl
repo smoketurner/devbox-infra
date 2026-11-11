@@ -11,9 +11,16 @@ schemaVersion: 1.0
 #   - a drop-in gating the allocator on /dev/nitro_enclaves, so the same AMI boots
 #     cleanly on hosts launched without enclave options (the default) and on the
 #     Image Builder build/test instances.
-# The guest VMM (Firecracker with sandbox support) and guest image are not baked
-# here: AWS documents no package or release for a sandbox-capable build yet, and
-# the launcher belongs to devbox-agent (agent-contract ordering gate).
+#   - devbox-sandboxd.service: the root daemon (`devbox-agent sandboxd`) that
+#     jails and runs sandbox VMMs and their vsock relays for the claimant's
+#     `devbox-agent sandbox` commands, gated on /dev/nitro_enclaves like the
+#     allocator. Needs an agent release with `sandboxd` (ordering gate).
+# The script and units are real files, injected verbatim by components.tf so
+# they can be linted and diffed on their own: scripts/devbox-nitro-sandbox-size.sh,
+# files/nitro-enclaves-allocator-devbox.conf, files/devbox-sandboxd.service.
+# The guest VMM (Firecracker with sandbox support), jailer and guest image are
+# not baked here yet: AWS documents no package or release for a sandbox-capable
+# build.
 phases:
   - name: build
     steps:
@@ -28,47 +35,26 @@ phases:
           commands:
             - |
               cat > /usr/local/sbin/devbox-nitro-sandbox-size <<'EOF'
-              #!/bin/bash
-              # Size the Nitro Enclaves allocator pool for Nitro Sandboxes from this
-              # host's resources. Sandbox memory is never overcommitted and pinned
-              # vCPUs come out of this pool, so whatever is reserved here is taken
-              # from the claimant's own session. Defaults: half the vCPUs (at least
-              # 1, as AWS requires on a 2-vCPU Graviton host) and a quarter of RAM.
-              # Override via /etc/devbox/nitro-sandbox.env:
-              #   DEVBOX_SANDBOX_CPU_PERCENT, DEVBOX_SANDBOX_MEMORY_PERCENT
-              set -euo pipefail
-              if [ -r /etc/devbox/nitro-sandbox.env ]; then
-                # shellcheck disable=SC1091
-                . /etc/devbox/nitro-sandbox.env
-              fi
-              cpu_percent="${DEVBOX_SANDBOX_CPU_PERCENT:-50}"
-              mem_percent="${DEVBOX_SANDBOX_MEMORY_PERCENT:-25}"
-              vcpus="$(nproc --all)"
-              mem_mib="$(awk '/^MemTotal:/ { print int($2 / 1024) }' /proc/meminfo)"
-              cpu_count=$((vcpus * cpu_percent / 100))
-              if [ "$cpu_count" -lt 1 ]; then cpu_count=1; fi
-              if [ "$cpu_count" -ge "$vcpus" ]; then cpu_count=$((vcpus - 1)); fi
-              memory_mib=$((mem_mib * mem_percent / 100))
-              if [ "$memory_mib" -lt 512 ]; then memory_mib=512; fi
-              install -d -m 0755 /etc/nitro_enclaves
-              printf -- '---\nmemory_mib: %s\ncpu_count: %s\n' "$memory_mib" "$cpu_count" \
-                >/etc/nitro_enclaves/allocator.yaml
-              echo "nitro sandbox pool: cpu_count=${cpu_count}/${vcpus} memory_mib=${memory_mib}/${mem_mib}"
+              ${indent(14, trimspace(nitro_sandbox_size_script))}
               EOF
             - chmod 0755 /usr/local/sbin/devbox-nitro-sandbox-size
             - mkdir -p /etc/systemd/system/nitro-enclaves-allocator.service.d
             - |
               cat > /etc/systemd/system/nitro-enclaves-allocator.service.d/10-devbox.conf <<'EOF'
-              [Unit]
-              # Only enclave-enabled launches (pool nitro_sandboxes_enabled) expose
-              # the device; elsewhere the unit is skipped, not failed.
-              ConditionPathExists=/dev/nitro_enclaves
-
-              [Service]
-              ExecStartPre=/usr/local/sbin/devbox-nitro-sandbox-size
+              ${indent(14, trimspace(nitro_allocator_dropin))}
               EOF
             - systemctl daemon-reload
             - systemctl enable nitro-enclaves-allocator.service
+      - name: InstallSandboxDaemon
+        action: ExecuteBash
+        inputs:
+          commands:
+            - |
+              cat > /etc/systemd/system/devbox-sandboxd.service <<'EOF'
+              ${indent(14, trimspace(sandboxd_unit))}
+              EOF
+            - systemctl daemon-reload
+            - systemctl enable devbox-sandboxd.service
   - name: validate
     steps:
       - name: ValidateNitroSandboxes
@@ -80,6 +66,8 @@ phases:
             - bash -n /usr/local/sbin/devbox-nitro-sandbox-size || exit 1
             - grep -q "ConditionPathExists=/dev/nitro_enclaves" /etc/systemd/system/nitro-enclaves-allocator.service.d/10-devbox.conf || exit 1
             - systemctl is-enabled nitro-enclaves-allocator.service || exit 1
+            - systemd-analyze verify /etc/systemd/system/devbox-sandboxd.service || exit 1
+            - systemctl is-enabled devbox-sandboxd.service || exit 1
   - name: test
     steps:
       - name: TestNitroSandboxes
@@ -96,10 +84,14 @@ phases:
               if [ -e /dev/nitro_enclaves ]; then
                 systemctl is-active nitro-enclaves-allocator.service || exit 1
                 test -s /etc/nitro_enclaves/allocator.yaml || exit 1
+                systemctl is-active devbox-sandboxd.service || exit 1
+                test -S /run/devbox/sandboxd.sock || exit 1
               else
-                if systemctl is-failed --quiet nitro-enclaves-allocator.service; then
-                  echo "allocator failed on a host without /dev/nitro_enclaves"
-                  exit 1
-                fi
+                for unit in nitro-enclaves-allocator.service devbox-sandboxd.service; do
+                  if systemctl is-failed --quiet "$unit"; then
+                    echo "$unit failed on a host without /dev/nitro_enclaves"
+                    exit 1
+                  fi
+                done
               fi
             - echo "Nitro Sandbox host prep verified on boot"

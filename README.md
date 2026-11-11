@@ -90,8 +90,25 @@ so a claimant can run sub-agents in [Nitro Sandboxes](https://docs.aws.amazon.co
 enclave-capable instance type (not T-family or `.medium`; a plan-time precondition
 enforces this) and an AMI with the `07-nitro-sandboxes` component, whose allocator
 reserves half the host's vCPUs and a quarter of its memory for the sandbox pool
-(override in `/etc/devbox/nitro-sandbox.env`). The AMI prepares only the parent side;
-the sandbox launcher and guest image are tracked in `smoketurner/devbox`.
+(override in `/etc/devbox/nitro-sandbox.env`). It also installs
+`devbox-sandboxd.service`, the root daemon (`devbox-agent sandboxd`) that jails and
+runs sandbox VMMs for the claimant's `devbox-agent sandbox` commands. Like the
+allocator, it only starts on hosts that have `/dev/nitro_enclaves`.
+
+The `08-sandbox-guest` component builds the guest those VMMs boot:
+- `/opt/devbox/sandbox/rootfs.ext4`, an Amazon Linux 2023 root built with
+  `dnf --installroot` (`sandbox_guest_packages`);
+- the harness CLIs from npm (`sandbox_guest_npm_packages`; pin versions for
+  reproducible AMIs);
+- the host's own `devbox-agent`;
+- `devbox-guest.service`, which runs `devbox-agent guest`.
+
+Firecracker, `jailer` and the guest kernel are baked only when you supply them.
+AWS publishes no sandbox-capable build we can point at yet. Upload each to the
+components bucket at `sandbox-artifacts/<name>` (`firecracker`, `jailer`,
+`vmlinux`) and list it with its sha256 in `sandbox_artifacts`. The build fetches
+it with `S3Download` and refuses a checksum mismatch. Until then, the sandbox
+daemon's preflight names what is missing.
 
 ### `control-plane` — orchestration
 

@@ -43,14 +43,15 @@ module "image_builder" {
     "04-ssh.yml",
     "05-docker-images.yml.tftpl",
     "06-workspace-test.yml.tftpl",
-    "07-nitro-sandboxes.yml",
+    "07-nitro-sandboxes.yml.tftpl",
+    "08-sandbox-guest.yml.tftpl",
   ]
 
   # Pin a concrete release asset instead of tracking the mutable releases/latest
   # default (infra #26): a build can't silently bake whatever happens to be
   # "latest" at build time. The 04-devbox component still fetches that release's
   # own SHA256SUMS and verifies the binary against it at build time.
-  devbox_agent_url = "https://github.com/smoketurner/devbox/releases/download/v0.1.12/devbox-agent-aarch64-unknown-linux-musl"
+  devbox_agent_url = "https://github.com/smoketurner/devbox/releases/download/v0.1.13/devbox-agent-aarch64-unknown-linux-musl"
 
   # The warming agent (and the test-stage warm-up) request repo-scoped GitHub
   # tokens from the control plane, authenticated by the instance's AWS identity.

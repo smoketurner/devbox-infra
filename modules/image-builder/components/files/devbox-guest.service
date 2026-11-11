@@ -1,0 +1,20 @@
+[Unit]
+Description=devbox sandbox guest: run the sub-agent and hand its work back
+Documentation=https://github.com/smoketurner/devbox/tree/main/crates/devbox-agent#sandbox--sub-agents-in-nitro-sandboxes
+# The guest has no network device; it only needs its local filesystems.
+After=local-fs.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/devbox-agent guest
+Environment=HOME=/root
+WorkingDirectory=/
+# The serial console is the host's console.log for this sandbox.
+StandardOutput=journal+console
+StandardError=journal+console
+# The init powers off when it finishes; if it fails instead, power off anyway
+# so the VMM exits and the host can collect what is on the workspace drive.
+FailureAction=poweroff
+
+[Install]
+WantedBy=multi-user.target

@@ -22,6 +22,17 @@ locals {
       # Complex orchestration kept in a linted .sh file, injected verbatim (its
       # bash $${...} is not re-interpreted, so no templatefile escaping needed).
       test_workspace_mount_script = file("${path.module}/components/scripts/test-workspace-mount.sh")
+      # The Nitro Sandboxes host files, injected verbatim the same way.
+      nitro_sandbox_size_script = file("${path.module}/components/scripts/devbox-nitro-sandbox-size.sh")
+      nitro_allocator_dropin    = file("${path.module}/components/files/nitro-enclaves-allocator-devbox.conf")
+      sandboxd_unit             = file("${path.module}/components/files/devbox-sandboxd.service")
+      # The sandbox guest image (08-sandbox-guest).
+      sandbox_guest_build_script = file("${path.module}/components/scripts/build-sandbox-guest.sh")
+      sandbox_guest_unit         = file("${path.module}/components/files/devbox-guest.service")
+      guest_packages             = join(" ", var.sandbox_guest_packages)
+      guest_npm_packages         = join(" ", var.sandbox_guest_npm_packages)
+      sandbox_artifacts          = var.sandbox_artifacts
+      components_bucket          = aws_s3_bucket.components.bucket
     }) : file("${path.module}/components/${f}")
   }
 
