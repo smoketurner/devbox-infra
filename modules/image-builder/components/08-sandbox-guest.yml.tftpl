@@ -1,21 +1,40 @@
 name: SandboxGuest
-description: Build the Nitro Sandbox guest root filesystem and, when configured, install the sandbox VMM, jailer and guest kernel
+description: Install Firecracker and jailer, and build the Nitro Sandbox guest kernel, initramfs and root filesystem
 schemaVersion: 1.0
 # The guest half of devbox sub-agent sandboxes (smoketurner/devbox#164):
+#   - /usr/local/bin/{firecracker,jailer}: the upstream Firecracker release
+#     (1.18 or later supports Nitro Sandboxes), checked against
+#     var.firecracker_sha256 before anything is installed.
+#   - /opt/devbox/sandbox/vmlinuz: the kernel this AMI boots. AWS boots the guest
+#     on the parent's own AL2023 kernel (an EFI-stub image).
+#   - /opt/devbox/sandbox/initrd.img: a dracut initramfs for that kernel, which
+#     loads the modules the guest needs before its root drive mounts
+#     (kernel6.18 builds them as modules) and runs systemd-volatile-root for
+#     the read-only root (systemd.volatile=overlay).
 #   - /opt/devbox/sandbox/rootfs.ext4: an Amazon Linux 2023 root (dnf
 #     --installroot) with git, Node and the harness CLIs, the same
 #     devbox-agent as the host, and devbox-guest.service (`devbox-agent guest`).
-#     Built by scripts/build-sandbox-guest.sh, injected verbatim by components.tf.
-#   - Optionally Firecracker, jailer and the guest kernel, downloaded with
-#     S3Download from the components bucket (sandbox-artifacts/<name>) and
-#     checked against the sha256s in var.sandbox_artifacts. They are not
-#     downloaded from anywhere else, because AWS publishes no sandbox-capable
-#     build we can point at yet. With none configured, the daemon's preflight
-#     reports what is missing.
+# The kernel, initramfs and root filesystem are built by
+# scripts/build-sandbox-guest.sh, injected verbatim by components.tf.
 phases:
   - name: build
     steps:
-      - name: BuildGuestRootfs
+      - name: InstallFirecracker
+        action: ExecuteBash
+        inputs:
+          commands:
+            - |
+              set -euo pipefail
+              tmp="$(mktemp -d /var/tmp/firecracker.XXXXXX)"
+              curl -fsSL --retry 3 -o "$tmp/firecracker.tgz" \
+                "https://github.com/firecracker-microvm/firecracker/releases/download/v${firecracker_version}/firecracker-v${firecracker_version}-aarch64.tgz"
+              echo "${firecracker_sha256}  $tmp/firecracker.tgz" | sha256sum -c -
+              tar -xzf "$tmp/firecracker.tgz" -C "$tmp"
+              release="$tmp/release-v${firecracker_version}-aarch64"
+              install -m 0755 "$release/firecracker-v${firecracker_version}-aarch64" /usr/local/bin/firecracker
+              install -m 0755 "$release/jailer-v${firecracker_version}-aarch64" /usr/local/bin/jailer
+              rm -rf "$tmp"
+      - name: BuildSandboxGuest
         action: ExecuteBash
         timeoutSeconds: 3600
         inputs:
@@ -34,44 +53,20 @@ phases:
               GUEST_UNIT=/var/tmp/devbox-guest.service
               bash /var/tmp/build-sandbox-guest.sh
             - rm -f /var/tmp/build-sandbox-guest.sh /var/tmp/devbox-guest.service
-%{ if length(sandbox_artifacts) > 0 ~}
-      - name: DownloadSandboxArtifacts
-        action: S3Download
-        inputs:
-%{ for name, sha in sandbox_artifacts ~}
-          - source: s3://${components_bucket}/sandbox-artifacts/${name}
-            destination: /var/tmp/sandbox-artifacts/${name}
-%{ endfor ~}
-      - name: InstallSandboxArtifacts
-        action: ExecuteBash
-        inputs:
-          commands:
-%{ for name, sha in sandbox_artifacts ~}
-            - echo "${sha}  /var/tmp/sandbox-artifacts/${name}" | sha256sum -c -
-%{ if name == "vmlinux" ~}
-            - install -D -m 0644 /var/tmp/sandbox-artifacts/vmlinux /opt/devbox/sandbox/vmlinux
-%{ else ~}
-            - install -D -m 0755 /var/tmp/sandbox-artifacts/${name} /usr/local/bin/${name}
-%{ endif ~}
-%{ endfor ~}
-            - rm -rf /var/tmp/sandbox-artifacts
-%{ endif ~}
   - name: validate
     steps:
       - name: ValidateSandboxGuest
         action: ExecuteBash
         inputs:
           commands:
+            - /usr/local/bin/firecracker --version | grep -q "v${firecracker_version}" || exit 1
+            - /usr/local/bin/jailer --version | grep -q "v${firecracker_version}" || exit 1
+            - cmp -s "$(grubby --default-kernel)" /opt/devbox/sandbox/vmlinuz || exit 1
+            - lsinitrd /opt/devbox/sandbox/initrd.img | grep -q "virtio_blk.ko" || exit 1
+            - lsinitrd /opt/devbox/sandbox/initrd.img | grep -q "systemd-volatile-root" || exit 1
             - test -s /opt/devbox/sandbox/rootfs.ext4 || exit 1
             - debugfs -R "stat /usr/local/sbin/devbox-agent" /opt/devbox/sandbox/rootfs.ext4 | grep -q "Type: regular" || exit 1
             - debugfs -R "ls -l /etc/systemd/system/multi-user.target.wants" /opt/devbox/sandbox/rootfs.ext4 | grep -q devbox-guest.service || exit 1
-%{ for name, sha in sandbox_artifacts ~}
-%{ if name == "vmlinux" ~}
-            - test -s /opt/devbox/sandbox/vmlinux || exit 1
-%{ else ~}
-            - /usr/local/bin/${name} --version || exit 1
-%{ endif ~}
-%{ endfor ~}
   - name: test
     steps:
       - name: TestSandboxGuest
@@ -79,5 +74,11 @@ phases:
         inputs:
           commands:
             - echo "=== Testing the sandbox guest image on the booted AMI ==="
+            - /usr/local/bin/firecracker --version || exit 1
+            - /usr/local/bin/jailer --version || exit 1
+            # The guest must boot the kernel the host booted, or the initramfs
+            # modules won't load.
+            - cmp -s "/boot/vmlinuz-$(uname -r)" /opt/devbox/sandbox/vmlinuz || exit 1
+            - test -s /opt/devbox/sandbox/initrd.img || exit 1
             - test -s /opt/devbox/sandbox/rootfs.ext4 || exit 1
             - echo "Sandbox guest image present"

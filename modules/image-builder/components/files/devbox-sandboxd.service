@@ -4,7 +4,7 @@ Documentation=https://github.com/smoketurner/devbox/tree/main/crates/devbox-agen
 # Only enclave-enabled launches (pool nitro_sandboxes_enabled) can run
 # sandboxes; elsewhere the unit is skipped, not failed.
 ConditionPathExists=/dev/nitro_enclaves
-After=network-online.target workspace.mount nitro-enclaves-allocator.service
+After=network-online.target workspace.mount
 Wants=network-online.target
 
 [Service]

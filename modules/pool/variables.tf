@@ -30,7 +30,7 @@ variable "instance_type" {
 }
 
 variable "nitro_sandboxes_enabled" {
-  description = "Launch pool hosts with Nitro Enclaves enabled so claimants can run sub-agents in Nitro Sandboxes (hardware-isolated child VMs, no nested virtualization). Requires an enclave-capable instance type — not T-family or .medium sizes — and an AMI built with the 07-nitro-sandboxes component. The AMI's allocator reserves part of each host's vCPUs and memory for the sandbox pool, so size instance_type up (e.g. m7g.2xlarge) when enabling."
+  description = "Launch pool hosts with Nitro Enclaves enabled so claimants can run sub-agents in Nitro Sandboxes (hardware-isolated child VMs, no nested virtualization). Requires an enclave-capable instance type — not T-family or .medium sizes — and an AMI built with the 07-nitro-sandboxes component. The AMI reserves part of each host's memory for sandboxes (image-builder sandbox_memory_percent), and sandbox vCPUs come out of the host's, so size instance_type up (e.g. m7g.2xlarge) when enabling."
   type        = bool
   default     = false
 }
